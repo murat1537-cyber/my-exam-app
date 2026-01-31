@@ -11,7 +11,7 @@ st.markdown("""
     <style>
     * { -webkit-user-select: none; user-select: none; }
     .main { background-color: #f8f9fa; }
-    .q-card { background: white; padding: 2.5rem; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); border-top: 5px solid #007bff; margin-bottom: 20px; }
+    .q-card { background: white; padding: 2rem; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); border-top: 5px solid #007bff; margin-bottom: 20px; }
     .timer-box { font-size: 22px; font-weight: bold; color: #d32f2f; text-align: center; padding: 10px; background: #ffebee; border-radius: 10px; margin-bottom: 20px; }
     .stButton>button { border-radius: 12px; height: 3.5em; font-weight: 600; }
     </style>
@@ -27,61 +27,65 @@ if 'feedback' not in st.session_state: st.session_state.feedback = None
 if 'smart_list' not in st.session_state: st.session_state.smart_list = None
 if 'start_time' not in st.session_state: st.session_state.start_time = None
 
-# --- 4. VERİ YAZMA (YENİ SATIR EKLEME) ---
+# --- 4. VERİ YAZMA (STANDARTLAŞTIRILMIŞ) ---
 def save_stat(q_id, correct, confidence, reason):
     try:
-        # Mevcut verileri çek (Önbelleksiz)
         existing_df = conn.read(worksheet="User_Stats", ttl=0)
-        
-        # [cite_start]Yeni satırı hazırla [cite: 136-144]
+        # Verileri standart metin formatına çevirerek karışıklığı önle
         new_row = pd.DataFrame([{
             "user_id": "User_01",
             "question_id": str(q_id),
-            "is_correct": "True" if correct else "False",
-            "confidence_level": str(confidence),
+            "is_correct": "TRUE" if correct else "FALSE",
+            "confidence_level": str(confidence) if confidence else "None",
             "error_reason": str(reason) if reason else "None",
             "attempt_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         }])
-        
-        # Eski ve yeniyi birleştir
         updated_df = pd.concat([existing_df, new_row], ignore_index=True).dropna(how='all')
-        
-        # Google Sheets'e tek parça halinde GÜNCELLE
         conn.update(worksheet="User_Stats", data=updated_df)
         return True
     except Exception as e:
         st.error(f"Save error: {e}")
         return False
 
-# --- 5. HATA RAPORU OLUŞTURMA (PDF GÜNCELLENDİ) ---
+# --- 5. PDF RAPORU (DÜZELTİLMİŞ TASARIM) ---
 def create_error_report(stats_df, questions_df):
     pdf = FPDF()
     pdf.add_page()
-    pdf.set_font("Arial", "B", 16)
-    pdf.cell(200, 10, "Wrong Answers & Analysis Report", ln=True, align='C')
+    pdf.set_font("Helvetica", "B", 16)
+    pdf.cell(0, 10, "Wrong Answers & Analysis Report", ln=True, align='C')
     pdf.ln(10)
     
-    wrong_stats = stats_df[(stats_df['is_correct'] == "False") | (stats_df['confidence_level'] == "Guessed")]
+    # Yanlışları standartlaştırılmış değerlere göre filtrele
+    wrong_stats = stats_df[(stats_df['is_correct'] == "FALSE") | (stats_df['confidence_level'] == "Guessed")]
     
     if wrong_stats.empty:
-        pdf.set_font("Arial", "", 12)
-        pdf.cell(200, 10, "No errors to report.", ln=True)
+        pdf.set_font("Helvetica", "", 12)
+        pdf.cell(0, 10, "No errors found! Great job.", ln=True)
     else:
         for _, row in wrong_stats.iterrows():
             q_info = questions_df[questions_df['id'].astype(str) == str(row['question_id'])]
             if not q_info.empty:
-                q_text = q_info['content_text'].values[0]
-                ans = q_info['correct_option'].values[0]
-                pdf.set_font("Arial", "B", 10)
-                pdf.multi_cell(0, 8, f"Q: {q_text}")
-                pdf.set_font("Arial", "", 9)
-                pdf.cell(0, 8, f"Correct: {ans} | Error: {row['error_reason']} | Date: {row['attempt_date']}", ln=True)
-                pdf.ln(3)
-                pdf.cell(0, 0, "", "T", ln=True)
-                pdf.ln(3)
+                q_text = str(q_info['content_text'].values[0])
+                ans = str(q_info['correct_option'].values[0])
+                
+                # Soru Metni (Otomatik satır atlamalı)
+                pdf.set_font("Helvetica", "B", 10)
+                pdf.multi_cell(0, 7, f"Question: {q_text}")
+                
+                # Detaylar
+                pdf.set_font("Helvetica", "", 9)
+                details = f"Correct Answer: {ans} | Reason: {row['error_reason']} | Date: {row['attempt_date']}"
+                pdf.multi_cell(0, 7, details)
+                pdf.ln(2)
+                pdf.line(10, pdf.get_y(), 200, pdf.get_y())
+                pdf.ln(5)
+                
+                # Sayfa sonu kontrolü
+                if pdf.get_y() > 260:
+                    pdf.add_page()
     
-    # PDF'i binary (bayt) formatına çevir (Hata çözümü)
-    return pdf.output()
+    # PDF verisini doğru bayt formatında döndür
+    return bytes(pdf.output())
 
 # --- 6. NAVİGASYON ---
 with st.sidebar:
@@ -99,10 +103,6 @@ with st.sidebar:
     
     if st.session_state.view == 'Study':
         st.write("---")
-        if st.button("⬅️ Back to Last Question") and st.session_state.q_idx > 0:
-            st.session_state.q_idx -= 1
-            st.session_state.feedback = None
-            st.rerun()
         if st.button("🛑 Finish Early"):
             st.session_state.view = 'Analytics'
             st.rerun()
@@ -112,10 +112,11 @@ if st.session_state.view == 'Study' and st.session_state.smart_list is not None:
     if st.session_state.start_time:
         elapsed = datetime.now() - st.session_state.start_time
         remaining = timedelta(minutes=10) - elapsed
-        if remaining.total_seconds() <= 0:
+        if remaining.total_seconds() > 0:
+            st.markdown(f'<div class="timer-box">⏱️ Time Left: {str(remaining).split(".")[0]}</div>', unsafe_allow_html=True)
+        else:
             st.session_state.view = 'Analytics'
             st.rerun()
-        st.markdown(f'<div class="timer-box">⏱️ Time Left: {str(remaining).split(".")[0]}</div>', unsafe_allow_html=True)
 
     df = st.session_state.smart_list
     curr = df.iloc[st.session_state.q_idx]
@@ -149,19 +150,18 @@ elif st.session_state.view == 'Analytics':
     questions = conn.read(worksheet="Questions", ttl=0)
     
     if not stats.empty:
-        stats['is_correct'] = stats['is_correct'].astype(str)
+        stats['is_correct'] = stats['is_correct'].astype(str).str.upper()
         
         col_pie, col_bar = st.columns(2)
         with col_pie:
             fig_pie = px.pie(stats, names='is_correct', title="Accuracy Rate", 
-                             color='is_correct', color_discrete_map={'True':'#2ecc71', 'False':'#e74c3c'})
+                             color='is_correct', color_discrete_map={'TRUE':'#2ecc71', 'FALSE':'#e74c3c'})
             st.plotly_chart(fig_pie, use_container_width=True)
             
         with col_bar:
-            st.subheader("📋 Download Error Report")
+            st.subheader("📋 Download Report")
             if st.button("Prepare PDF Report"):
-                report_pdf = create_error_report(stats, questions)
-                # Binary veriyi indirilebilir dosya olarak sun
-                st.download_button(label="📥 Download (PDF)", data=bytes(report_pdf), file_name="error_analysis.pdf", mime="application/pdf")
+                report_data = create_error_report(stats, questions)
+                st.download_button(label="📥 Download (PDF)", data=report_data, file_name="analysis.pdf", mime="application/pdf")
     else:
-        st.info("No data found.")
+        st.info("No data yet.")
