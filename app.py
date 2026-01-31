@@ -5,7 +5,7 @@ import plotly.express as px
 from datetime import datetime, timedelta
 from fpdf import FPDF
 
-# --- 1. TOPIC MAPPING (English) ---
+# --- 1. CISSP TOPIC MAPPING (Updated) ---
 TOPIC_MAP = {
     "1": "Security and Risk Management",
     "2": "Asset Security",
@@ -18,7 +18,7 @@ TOPIC_MAP = {
 }
 
 # --- 2. DESIGN & SECURITY ---
-st.set_page_config(page_title="AI Exam Mentor Pro", layout="wide")
+st.set_page_config(page_title="CISSP AI Mentor Pro", layout="wide")
 st.markdown("""
     <style>
     * { -webkit-user-select: none; user-select: none; }
@@ -34,17 +34,17 @@ st.markdown("""
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 # Initialize Session States
-init_states = {
-    'q_idx': 0, 'view': 'Main', 'feedback': None, 
-    'smart_list': None, 'start_time': None, 
-    'admin_auth': False, 'is_sprint_active': False
-}
-for key, val in init_states.items():
-    if key not in st.session_state: st.session_state[key] = val
+if 'q_idx' not in st.session_state: st.session_state.q_idx = 0
+if 'view' not in st.session_state: st.session_state.view = 'Main'
+if 'feedback' not in st.session_state: st.session_state.feedback = None
+if 'smart_list' not in st.session_state: st.session_state.smart_list = None
+if 'start_time' not in st.session_state: st.session_state.start_time = None
+if 'admin_auth' not in st.session_state: st.session_state.admin_auth = False
+if 'is_sprint_active' not in st.session_state: st.session_state.is_sprint_active = False
 
 # --- 4. UTILITY FUNCTIONS ---
-def tr_to_en(text):
-    """Fixes PDF Encoding issues by replacing Turkish chars"""
+def safe_text(text):
+    """Replaces non-standard characters to prevent PDF crashes"""
     mapping = str.maketrans("ğĞçÇşŞüÜöÖıİ", "gGcCsSuUoOiI")
     return str(text).translate(mapping)
 
@@ -67,41 +67,49 @@ def create_pdf(stats_df, questions_df):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Helvetica", "B", 16)
-    pdf.cell(0, 10, tr_to_en("Personal Performance Analysis"), ln=True, align='C')
+    pdf.cell(0, 10, safe_text("CISSP Performance Analysis"), ln=True, align='C')
     pdf.ln(10)
     
-    # Normalize data for filtering
-    stats_df['is_correct'] = stats_df['is_correct'].astype(str).str.upper().replace({'0':'FALSE','1':'TRUE', '0.0':'FALSE', '1.0':'TRUE'})
-    wrong_entries = stats_df[stats_df['is_correct'] == "FALSE"]
+    # Data Normalization
+    stats_df['is_correct_clean'] = stats_df['is_correct'].astype(str).str.upper().replace({'0':'FALSE','1':'TRUE', '0.0':'FALSE', '1.0':'TRUE'})
+    wrong_entries = stats_df[stats_df['is_correct_clean'] == "FALSE"]
     
     if wrong_entries.empty:
         pdf.set_font("Helvetica", "", 12)
         pdf.cell(0, 10, "No errors found to report.", ln=True)
     else:
         for _, row in wrong_entries.iterrows():
-            q_info = questions_df[questions_df['id'].astype(str).str.split('.').str[0] == str(row['question_id']).split('.').str[0]]
+            q_id_str = str(row['question_id']).split('.')[0]
+            q_info = questions_df[questions_df['id'].astype(str).str.split('.').str[0] == q_id_str]
+            
             if not q_info.empty:
                 pdf.set_font("Helvetica", "B", 10)
-                pdf.multi_cell(180, 7, tr_to_en(f"Question: {q_info['content_text'].values[0]}"))
+                pdf.multi_cell(180, 7, safe_text(f"Question: {q_info['content_text'].values[0]}"))
                 pdf.set_font("Helvetica", "", 9)
-                pdf.multi_cell(180, 6, tr_to_en(f"Correct: {q_info['correct_option'].values[0]} | Reason: {row['error_reason']}"))
+                pdf.multi_cell(180, 6, safe_text(f"Correct: {q_info['correct_option'].values[0]} | Reason: {row['error_reason']}"))
                 pdf.ln(5); pdf.line(10, pdf.get_y(), 200, pdf.get_y()); pdf.ln(5)
                 if pdf.get_y() > 250: pdf.add_page()
     return bytes(pdf.output())
 
-# --- 5. SIDEBAR (Navigation) ---
+# --- 5. SIDEBAR ---
 with st.sidebar:
     st.title("🏆 AI Mentor Pro")
     if st.session_state.is_sprint_active:
-        if st.button("▶️ Return to Sprint"): st.session_state.view = 'Study'; st.rerun()
-        if st.button("🛑 Terminate Sprint"): # Terminate feature
-            st.session_state.is_sprint_active = False; st.session_state.view = 'Analytics'; st.rerun()
+        if st.button("▶️ Return to Sprint"): 
+            st.session_state.view = 'Study'
+            st.rerun()
+        if st.button("🛑 Terminate Sprint"): # Fixed swap logic
+            st.session_state.is_sprint_active = False
+            st.session_state.view = 'Analytics'
+            st.rerun()
     else:
         if st.button("🚀 Start New Sprint"):
             q_df = conn.read(worksheet="Questions", ttl=0)
             st.session_state.smart_list = q_df.sample(frac=1).reset_index(drop=True)
             st.session_state.q_idx = 0; st.session_state.start_time = datetime.now()
-            st.session_state.is_sprint_active = True; st.session_state.view = 'Study'; st.rerun()
+            st.session_state.is_sprint_active = True
+            st.session_state.view = 'Study'
+            st.rerun()
     
     st.write("---")
     if st.button("📊 Performance Analytics"): st.session_state.view = 'Analytics'
@@ -118,11 +126,10 @@ if st.session_state.view == 'Study' and st.session_state.smart_list is not None:
     st.markdown(f'<div class="timer-box">⏱️ Time Left: {str(remaining).split(".")[0]}</div>', unsafe_allow_html=True)
 
     curr = st.session_state.smart_list.iloc[st.session_state.q_idx]
-    # Handle float ID mismatch for topic names
-    t_id = str(curr['topic_id']).split('.')[0]
-    topic_name = TOPIC_MAP.get(t_id, "General")
+    t_id_clean = str(curr['topic_id']).split('.')[0]
+    topic_display = TOPIC_MAP.get(t_id_clean, "General Domain")
     
-    st.caption(f"📍 Topic: {topic_name}")
+    st.caption(f"📍 Domain: {topic_display}")
     st.markdown(f'<div class="q-card"><h3>{curr["content_text"]}</h3></div>', unsafe_allow_html=True)
     
     col1, col2 = st.columns(2)
@@ -154,44 +161,44 @@ if st.session_state.view == 'Study' and st.session_state.smart_list is not None:
 
 # ANALYTICS
 elif st.session_state.view == 'Analytics':
-    st.header("📊 Performance Dashboard")
+    st.header("📊 Domain Performance Analysis")
     stats = conn.read(worksheet="User_Stats", ttl=0)
     questions = conn.read(worksheet="Questions", ttl=0)
     
     if not stats.empty and not questions.empty:
-        # Data Normalization to fix float ID mismatch
+        # Clean IDs and Merge
         stats['qid_clean'] = stats['question_id'].astype(str).str.split('.').str[0]
         questions['qid_clean'] = questions['id'].astype(str).str.split('.').str[0]
         merged = pd.merge(stats, questions[['qid_clean', 'topic_id']], on='qid_clean')
         
-        # Map Topic Names
-        merged['Topic'] = merged['topic_id'].astype(str).str.split('.').str[0].map(TOPIC_MAP).fillna("Other")
-        merged['is_correct'] = merged['is_correct'].astype(str).str.upper().replace({'0':'FALSE','1':'TRUE', '0.0':'FALSE', '1.0':'TRUE'})
+        # Mapping CISSP Domains
+        merged['Domain'] = merged['topic_id'].astype(str).str.split('.').str[0].map(TOPIC_MAP).fillna("Other Domains")
+        merged['is_correct_clean'] = merged['is_correct'].astype(str).str.upper().replace({'0':'FALSE','1':'TRUE', '0.0':'FALSE', '1.0':'TRUE'})
 
         col_pie, col_bar = st.columns([1, 2])
         with col_pie:
-            st.plotly_chart(px.pie(merged, names='is_correct', title="Global Success", hole=0.4, color_discrete_map={'TRUE':'#2ecc71','FALSE':'#e74c3c'}), use_container_width=True)
-            if st.button("📥 Download Analysis (PDF)"):
+            st.plotly_chart(px.pie(merged, names='is_correct_clean', title="Success Rate", hole=0.4, color_discrete_map={'TRUE':'#2ecc71','FALSE':'#e74c3c'}), use_container_width=True)
+            if st.button("📥 Download PDF Report"):
                 report = create_pdf(stats, questions)
-                st.download_button("Click to Download", data=report, file_name="analysis.pdf")
+                st.download_button("Download Now", data=report, file_name="cissp_performance.pdf")
         
         with col_bar:
-            topic_chart = px.bar(merged, x='Topic', color='is_correct', barmode='group', title="Accuracy by Topic", color_discrete_map={'TRUE':'#2ecc71','FALSE':'#e74c3c'})
+            topic_chart = px.bar(merged, x='Domain', color='is_correct_clean', barmode='group', title="Accuracy by CISSP Domain", color_discrete_map={'TRUE':'#2ecc71','FALSE':'#e74c3c'})
             st.plotly_chart(topic_chart, use_container_width=True)
     else:
-        st.info("No statistics recorded yet. Start a sprint!")
+        st.info("No data recorded yet. Start a session!")
 
 # ADMIN
 elif st.session_state.view == 'Admin':
     if not st.session_state.admin_auth:
-        pw = st.text_input("Enter Password", type="password")
+        pw = st.text_input("Admin Password", type="password")
         if pw == "1234": st.session_state.admin_auth = True; st.rerun()
     else:
-        st.subheader("Bulk Question Upload")
-        uploaded = st.file_uploader("Choose Excel File", type=['xlsx'])
+        st.subheader("Admin Domain Management")
+        uploaded = st.file_uploader("Upload .xlsx Question Set", type=['xlsx'])
         if uploaded:
             new_q = pd.read_excel(uploaded)
-            if st.button("Update Cloud Database"):
+            if st.button("Sync Domain Data"):
                 old_q = conn.read(worksheet="Questions", ttl=0)
                 conn.update(worksheet="Questions", data=pd.concat([old_q, new_q], ignore_index=True))
-                st.success("Successfully updated!")
+                st.success("Domain database synchronized!")
