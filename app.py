@@ -7,14 +7,14 @@ from fpdf import FPDF
 
 # --- 1. KONU TANIMLAMALARI ---
 TOPIC_MAP = {
-    "1": "Trafik ve Çevre Bilgisi",
-    "2": "İlk Yardım Bilgisi",
-    "3": "Araç Tekniği",
-    "4": "Trafik Adabı",
-    "5": "Trafik İşaretleri",
-    "6": "Güvenli Sürüş Teknikleri",
-    "7": "Motor Bilgisi",
-    "8": "Genel Mevzuat"
+    "1": "Security and Risk Management",
+    "2": "Asset Security",
+    "3": "Security Architecture and Engineering",
+    "4": "Communication and Network Security",
+    "5": "Identity and Access Management (IAM)",
+    "6": "Security Assessment and Testing",
+    "7": "Security Operations",
+    "8": "Software Development Security"
 }
 
 # --- 2. TASARIM ---
