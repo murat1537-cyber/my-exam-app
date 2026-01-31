@@ -3,9 +3,8 @@ from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 import plotly.express as px
 from datetime import datetime, timedelta
-from fpdf import FPDF
 
-# --- 1. GÜVENLİK VE TASARIM ---
+# --- 1. TASARIM VE GÜVENLİK ---
 st.set_page_config(page_title="AI Exam Pro", layout="wide")
 st.markdown("""
     <style>
@@ -27,37 +26,37 @@ if 'feedback' not in st.session_state: st.session_state.feedback = None
 if 'smart_list' not in st.session_state: st.session_state.smart_list = None
 if 'start_time' not in st.session_state: st.session_state.start_time = None
 
-# --- 4. VERİ YAZMA FONKSİYONU (SATIR EKLEME DÜZELTİLDİ) ---
+# --- 4. VERİ YAZMA (KESİN ÇÖZÜM: APPEND) ---
 def save_stat(q_id, correct, confidence, reason):
     try:
-        # 1. Mevcut verileri çek
-        existing_df = conn.read(worksheet="User_Stats")
+        # Mevcut verileri oku
+        existing_df = conn.read(worksheet="User_Stats", ttl=0)
         
-        # 2. Yeni veriyi hazırla [cite: 136-144]
+        # Yeni satırı oluştur [cite: 136-144]
         new_row = pd.DataFrame([{
             "user_id": "User_01",
-            "question_id": q_id,
-            "is_correct": 1 if correct else 0,
-            "confidence_level": confidence if confidence else "None",
-            "error_reason": reason if reason else "None",
+            "question_id": str(q_id),
+            "is_correct": "True" if correct else "False", # Metin olarak kaydetmek grafiği düzeltir
+            "confidence_level": str(confidence) if confidence else "None",
+            "error_reason": str(reason) if reason else "None",
             "attempt_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         }])
         
-        # 3. Eski ve yeniyi birleştir (Alt alta ekleme)
-        updated_df = pd.concat([existing_df, new_row], ignore_index=True)
+        # Boşlukları temizle ve birleştir
+        updated_df = pd.concat([existing_df, new_row], ignore_index=True).dropna(how='all')
         
-        # 4. Sayfayı tamamen güncelle (Hata almamak için update kullanıyoruz)
+        # Sayfayı güncelle
         conn.update(worksheet="User_Stats", data=updated_df)
         return True
     except Exception as e:
-        st.error(f"Error saving data: {e}")
+        st.error(f"Save error: {e}")
         return False
 
 # --- 5. NAVİGASYON ---
 with st.sidebar:
     st.title("🏆 Control Center")
     if st.button("📝 Start 10-Min Sprint"):
-        questions = conn.read(worksheet="Questions")
+        questions = conn.read(worksheet="Questions", ttl=0)
         st.session_state.smart_list = questions.sample(frac=1).reset_index(drop=True)
         st.session_state.q_idx = 0
         st.session_state.view = 'Study'
@@ -69,9 +68,8 @@ with st.sidebar:
     
     if st.session_state.view == 'Study':
         st.write("---")
-        if st.button("🛑 Finish Session Early"):
+        if st.button("🛑 Finish Early"):
             st.session_state.view = 'Analytics'
-            st.session_state.start_time = None
             st.rerun()
 
 # --- 6. ÇALIŞMA MODU ---
@@ -90,7 +88,6 @@ if st.session_state.view == 'Study' and st.session_state.smart_list is not None:
     
     st.markdown(f'<div class="q-card"><h3>{curr["content_text"]}</h3></div>', unsafe_allow_html=True)
     
-    # Şıklar (2x2)
     col1, col2 = st.columns(2)
     with col1:
         if st.button(f"A) {curr['option_a']}", use_container_width=True): st.session_state.feedback = ('A' == curr['correct_option']); st.session_state.last_q_id = curr['id']
@@ -99,7 +96,6 @@ if st.session_state.view == 'Study' and st.session_state.smart_list is not None:
         if st.button(f"B) {curr['option_b']}", use_container_width=True): st.session_state.feedback = ('B' == curr['correct_option']); st.session_state.last_q_id = curr['id']
         if st.button(f"D) {curr['option_d']}", use_container_width=True): st.session_state.feedback = ('D' == curr['correct_option']); st.session_state.last_q_id = curr['id']
 
-    # Geri Bildirim ve Alt Navigasyon
     if st.session_state.feedback is not None:
         if st.session_state.feedback:
             st.success("✅ Correct!")
@@ -113,18 +109,33 @@ if st.session_state.view == 'Study' and st.session_state.smart_list is not None:
             if r2.button("Attention"): save_stat(st.session_state.last_q_id, False, None, "Attention"); st.session_state.q_idx += 1; st.session_state.feedback = None; st.rerun()
             if r3.button("Logic"): save_stat(st.session_state.last_q_id, False, None, "Interpretation"); st.session_state.q_idx += 1; st.session_state.feedback = None; st.rerun()
 
-    # ÖNCEKİ SORU BUTONU 
     st.write("---")
-    if st.button("⬅️ View Previous Question") and st.session_state.q_idx > 0:
+    if st.button("⬅️ Previous Question") and st.session_state.q_idx > 0:
         st.session_state.q_idx -= 1
         st.session_state.feedback = None
         st.rerun()
 
-# --- 7. ANALİZ ---
+# --- 7. ANALİZ (DÜZELTİLDİ) ---
 elif st.session_state.view == 'Analytics':
-    st.header("📊 Session Summary")
-    stats = conn.read(worksheet="User_Stats")
+    st.header("📊 Performance Analytics")
+    stats = conn.read(worksheet="User_Stats", ttl=0)
+    
     if not stats.empty:
-        st.plotly_chart(px.pie(stats, names='is_correct', title="Overall Success Rate", hole=0.3))
+        # Veriyi temizle ve grafik için hazırla
+        stats['is_correct'] = stats['is_correct'].astype(str)
+        
+        col_pie, col_bar = st.columns(2)
+        with col_pie:
+            # Doğru/Yanlış oranını metinsel etiketlerle göster 
+            fig_pie = px.pie(stats, names='is_correct', title="Accuracy Rate", 
+                             color='is_correct', color_discrete_map={'True':'#2ecc71', 'False':'#e74c3c'})
+            st.plotly_chart(fig_pie, use_container_width=True)
+            
+        with col_bar:
+            # Hata nedenlerini göster [cite: 61]
+            if not stats[stats['is_correct'] == 'False'].empty:
+                fig_bar = px.bar(stats[stats['is_correct'] == 'False']['error_reason'].value_counts(), 
+                                 title="Reasons for Mistakes", labels={'value':'Count', 'index':'Reason'})
+                st.plotly_chart(fig_bar, use_container_width=True)
     else:
-        st.info("No data recorded yet.")
+        st.info("No stats recorded. Please solve some questions.")
