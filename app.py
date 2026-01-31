@@ -27,11 +27,11 @@ if 'feedback' not in st.session_state: st.session_state.feedback = None
 if 'smart_list' not in st.session_state: st.session_state.smart_list = None
 if 'start_time' not in st.session_state: st.session_state.start_time = None
 
-# --- 4. VERİ YAZMA (STANDARTLAŞTIRILMIŞ) ---
+# --- 4. VERİ YAZMA (TUTARLI FORMAT) ---
 def save_stat(q_id, correct, confidence, reason):
     try:
         existing_df = conn.read(worksheet="User_Stats", ttl=0)
-        # Verileri standart metin formatına çevirerek karışıklığı önle
+        # Verileri standart TRUE/FALSE metnine dönüştür
         new_row = pd.DataFrame([{
             "user_id": "User_01",
             "question_id": str(q_id),
@@ -47,7 +47,7 @@ def save_stat(q_id, correct, confidence, reason):
         st.error(f"Save error: {e}")
         return False
 
-# --- 5. PDF RAPORU (DÜZELTİLMİŞ TASARIM) ---
+# --- 5. PDF RAPORU (HATA GİDERİLMİŞ TASARIM) ---
 def create_error_report(stats_df, questions_df):
     pdf = FPDF()
     pdf.add_page()
@@ -55,12 +55,13 @@ def create_error_report(stats_df, questions_df):
     pdf.cell(0, 10, "Wrong Answers & Analysis Report", ln=True, align='C')
     pdf.ln(10)
     
-    # Yanlışları standartlaştırılmış değerlere göre filtrele
+    # Verileri normalize et (0/1 karmaşasını çöz)
+    stats_df['is_correct'] = stats_df['is_correct'].astype(str).str.upper().replace({'0': 'FALSE', '1': 'TRUE'})
     wrong_stats = stats_df[(stats_df['is_correct'] == "FALSE") | (stats_df['confidence_level'] == "Guessed")]
     
     if wrong_stats.empty:
         pdf.set_font("Helvetica", "", 12)
-        pdf.cell(0, 10, "No errors found! Great job.", ln=True)
+        pdf.cell(0, 10, "No errors found to report.", ln=True)
     else:
         for _, row in wrong_stats.iterrows():
             q_info = questions_df[questions_df['id'].astype(str) == str(row['question_id'])]
@@ -68,23 +69,20 @@ def create_error_report(stats_df, questions_df):
                 q_text = str(q_info['content_text'].values[0])
                 ans = str(q_info['correct_option'].values[0])
                 
-                # Soru Metni (Otomatik satır atlamalı)
+                # Soru metni için geniş alan kullan (Hata çözümü)
                 pdf.set_font("Helvetica", "B", 10)
-                pdf.multi_cell(0, 7, f"Question: {q_text}")
+                pdf.multi_cell(190, 7, f"Question: {q_text}") 
                 
-                # Detaylar
+                # Detaylar için alan
                 pdf.set_font("Helvetica", "", 9)
                 details = f"Correct Answer: {ans} | Reason: {row['error_reason']} | Date: {row['attempt_date']}"
-                pdf.multi_cell(0, 7, details)
+                pdf.multi_cell(190, 7, details) 
                 pdf.ln(2)
                 pdf.line(10, pdf.get_y(), 200, pdf.get_y())
                 pdf.ln(5)
                 
-                # Sayfa sonu kontrolü
-                if pdf.get_y() > 260:
-                    pdf.add_page()
+                if pdf.get_y() > 260: pdf.add_page()
     
-    # PDF verisini doğru bayt formatında döndür
     return bytes(pdf.output())
 
 # --- 6. NAVİGASYON ---
@@ -150,7 +148,8 @@ elif st.session_state.view == 'Analytics':
     questions = conn.read(worksheet="Questions", ttl=0)
     
     if not stats.empty:
-        stats['is_correct'] = stats['is_correct'].astype(str).str.upper()
+        # Görsel tutarlılık için normalize et
+        stats['is_correct'] = stats['is_correct'].astype(str).str.upper().replace({'0': 'FALSE', '1': 'TRUE'})
         
         col_pie, col_bar = st.columns(2)
         with col_pie:
