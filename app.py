@@ -80,3 +80,29 @@ if total_q > 0:
 
 else:
     st.warning("Please add questions to your Google Sheet.")
+
+# ANALİZ PANELİ (Analytics) [cite: 58-63, 214-224]
+def show_analytics():
+    st.header("📊 Your Performance Analytics")
+    
+    # User_Stats tablosunu oku [cite: 133-144]
+    stats_df = conn.read(worksheet="User_Stats")
+    
+    if not stats_df.empty:
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.subheader("Success Rate by Topic")
+            # Konu bazlı başarıyı hesapla ve göster (Bar Chart) [cite: 60, 153]
+            st.bar_chart(stats_df.groupby('topic_id')['is_correct'].mean())
+            
+        with col2:
+            st.subheader("Error Reasons")
+            # Neden yanlış yapılıyor? (Pie Chart) [cite: 61, 219, 220]
+            st.write(stats_df['error_reason'].value_counts())
+            
+        # Gelişim Grafiği (Line Chart) [cite: 62, 223]
+        st.subheader("Learning Progress")
+        st.line_chart(stats_df.set_index('attempt_date')['is_correct'].rolling(window=5).mean())
+    else:
+        st.info("No data yet. Solve some questions to see your analytics!")
