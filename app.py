@@ -4,7 +4,6 @@ import pandas as pd
 import plotly.express as px
 from datetime import datetime, timedelta
 from fpdf import FPDF
-import io
 
 # --- 1. GÜVENLİK VE TASARIM ---
 st.set_page_config(page_title="Secure Exam Master", layout="wide")
@@ -25,7 +24,7 @@ st.markdown("""
 try:
     conn = st.connection("gsheets", type=GSheetsConnection)
 except Exception:
-    st.error("Secrets configuration error! Please check your TOML format.")
+    st.error("Secrets hatası! Lütfen TOML formatını kontrol edin.")
     st.stop()
 
 # --- 3. OTURUM DURUMLARI ---
@@ -35,22 +34,28 @@ if 'feedback' not in st.session_state: st.session_state.feedback = None
 if 'smart_list' not in st.session_state: st.session_state.smart_list = None
 if 'start_time' not in st.session_state: st.session_state.start_time = None
 
-# --- 4. GÜVENLİ VERİ YAZMA FONKSİYONU ---
+# --- 4. GÜVENLİ VERİ YAZMA FONKSİYONU (DÜZELTİLDİ) ---
 def save_stat(q_id, correct, confidence, reason):
     try:
-        new_entry = pd.DataFrame([{
+        # Mevcut veriyi oku
+        existing_data = conn.read(worksheet="User_Stats")
+        
+        # Yeni satırı hazırla
+        new_row = pd.DataFrame([{
             "user_id": "User_01",
-            "question_id": q_id,
-            "is_correct": correct,
-            "confidence_level": confidence,
-            "error_reason": reason,
+            "question_id": str(q_id),
+            "is_correct": bool(correct),
+            "confidence_level": str(confidence),
+            "error_reason": str(reason) if reason else "None",
             "attempt_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         }])
-        # Veri yazma denemesi
-        conn.create(worksheet="User_Stats", data=new_entry)
+        
+        # Mevcut verinin altına ekle ve sayfayı GÜNCELLE (Create yerine Update/Update_worksheet mantığı)
+        updated_df = pd.concat([existing_data, new_row], ignore_index=True)
+        conn.update(worksheet="User_Stats", data=updated_df)
         return True
     except Exception as e:
-        st.error(f"⚠️ Writing Error: Ensure 'User_Stats' sheet exists and Editor access is granted. Details: {e}")
+        st.error(f"⚠️ Yazma Hatası: {e}")
         return False
 
 # --- 5. PDF RAPOR FONKSİYONU ---
@@ -68,7 +73,7 @@ def create_pdf(results_df):
     pdf.cell(200, 10, f"Accuracy: %{(correct/total)*100 if total > 0 else 0:.2f}", ln=True)
     return pdf.output()
 
-# --- 6. NAVİGASYON (GİRİŞ SAYFASI DÜZENLEMESİ) ---
+# --- 6. NAVİGASYON ---
 with st.sidebar:
     st.title("🏆 Control Center")
     if st.button("📝 Start 10-Min Sprint"):
@@ -81,31 +86,28 @@ with st.sidebar:
                 st.session_state.start_time = datetime.now()
                 st.rerun()
         except Exception:
-            st.error("Could not find 'Questions' sheet. Check naming!")
+            st.error("'Questions' sayfası bulunamadı!")
             
     if st.button("📊 Performance Analytics"):
         st.session_state.view = 'Analytics'
 
 # --- 7. ÇALIŞMA MODU ---
 if st.session_state.view == 'Study' and st.session_state.smart_list is not None:
-    # Sayaç
     if st.session_state.start_time:
         elapsed = datetime.now() - st.session_state.start_time
         remaining = timedelta(minutes=10) - elapsed
         if remaining.total_seconds() > 0:
             st.markdown(f'<div class="timer-box">⏱️ Time Left: {str(remaining).split(".")[0]}</div>', unsafe_allow_html=True)
         else:
-            st.warning("Time is up!")
+            st.warning("Süre doldu!")
             st.session_state.view = 'Analytics'
             st.rerun()
 
     df = st.session_state.smart_list
     if st.session_state.q_idx < len(df):
         curr = df.iloc[st.session_state.q_idx]
-        
         st.markdown(f'<div class="q-card"><h3>{curr["content_text"]}</h3></div>', unsafe_allow_html=True)
         
-        # 2x2 Şıklar
         col1, col2 = st.columns(2)
         with col1:
             if st.button(f"A) {curr['option_a']}", use_container_width=True): st.session_state.feedback = ('A' == curr['correct_option']); st.session_state.last_q_id = curr['id']
@@ -114,48 +116,46 @@ if st.session_state.view == 'Study' and st.session_state.smart_list is not None:
             if st.button(f"B) {curr['option_b']}", use_container_width=True): st.session_state.feedback = ('B' == curr['correct_option']); st.session_state.last_q_id = curr['id']
             if st.button(f"D) {curr['option_d']}", use_container_width=True): st.session_state.feedback = ('D' == curr['correct_option']); st.session_state.last_q_id = curr['id']
 
-        # Geri Bildirim
         if st.session_state.feedback is not None:
             if st.session_state.feedback:
-                st.success("✅ Correct!")
+                st.success("✅ Doğru!")
                 c1, c2 = st.columns(2)
-                if c1.button("🎯 Sure"): 
+                if c1.button("🎯 Eminim"): 
                     if save_stat(st.session_state.last_q_id, True, "Sure", None):
                         st.session_state.q_idx += 1; st.session_state.feedback = None; st.rerun()
-                if c2.button("🎲 Guessed"): 
+                if c2.button("🎲 Tahmin"): 
                     if save_stat(st.session_state.last_q_id, True, "Guessed", None):
                         st.session_state.q_idx += 1; st.session_state.feedback = None; st.rerun()
             else:
-                st.error(f"❌ Wrong! Correct: {curr['correct_option']}")
+                st.error(f"❌ Yanlış! Doğru cevap: {curr['correct_option']}")
                 r1, r2, r3 = st.columns(3)
-                if r1.button("Knowledge Gap"): 
+                if r1.button("Bilgi Eksikliği"): 
                     if save_stat(st.session_state.last_q_id, False, None, "Knowledge Gap"):
                         st.session_state.q_idx += 1; st.session_state.feedback = None; st.rerun()
-                if r2.button("Attention"): 
+                if r2.button("Dikkat Hatası"): 
                     if save_stat(st.session_state.last_q_id, False, None, "Attention"):
                         st.session_state.q_idx += 1; st.session_state.feedback = None; st.rerun()
-                if r3.button("Logic"): 
+                if r3.button("Yorum Hatası"): 
                     if save_stat(st.session_state.last_q_id, False, None, "Interpretation"):
                         st.session_state.q_idx += 1; st.session_state.feedback = None; st.rerun()
     else:
-        st.success("Session Complete! Check Analytics.")
+        st.success("Seans tamamlandı!")
 
 # --- 8. ANALİZ ---
 elif st.session_state.view == 'Analytics':
-    st.header("📊 Your Progress")
+    st.header("📊 Başarı Durumun")
     try:
         stats = conn.read(worksheet="User_Stats")
         if not stats.empty:
-            fig = px.pie(stats, names='is_correct', title="Accuracy (%)", hole=0.4)
+            fig = px.pie(stats, names='is_correct', title="Doğruluk Oranı", hole=0.4)
             st.plotly_chart(fig)
             
-            if st.button("Generate PDF Report"):
+            if st.button("Rapor Oluştur (PDF)"):
                 pdf_bytes = create_pdf(stats)
-                st.download_button("📥 Download Report", data=pdf_bytes, file_name="report.pdf", mime="application/pdf")
+                st.download_button("📥 İndir", data=pdf_bytes, file_name="rapor.pdf", mime="application/pdf")
         else:
-            st.info("No data yet.")
+            st.info("Henüz veri yok.")
     except Exception:
-        st.error("Could not load 'User_Stats'.")
-
+        st.error("'User_Stats' yüklenemedi.")
 else:
-    st.info("Please use the sidebar to start a session!")
+    st.info("Sınava başlamak için soldaki butonu kullanın!")
