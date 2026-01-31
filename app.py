@@ -20,14 +20,16 @@ st.markdown("""
 # --- 2. BAĞLANTI ---
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# --- 3. OTURUM DURUMLARI ---
+# --- 3. OTURUM DURUMLARI (SESSION STATE) ---
+# Uygulama ilk açıldığında bu değişkenler tanımlanır
 if 'q_idx' not in st.session_state: st.session_state.q_idx = 0
 if 'view' not in st.session_state: st.session_state.view = 'Main'
 if 'feedback' not in st.session_state: st.session_state.feedback = None
 if 'smart_list' not in st.session_state: st.session_state.smart_list = None
 if 'start_time' not in st.session_state: st.session_state.start_time = None
+if 'is_sprint_active' not in st.session_state: st.session_state.is_sprint_active = False
 
-# --- 4. VERİ YAZMA (STANDARTLAŞTIRILMIŞ) ---
+# --- 4. VERİ YAZMA FONKSİYONU ---
 def save_stat(q_id, correct, confidence, reason):
     try:
         existing_df = conn.read(worksheet="User_Stats", ttl=0)
@@ -46,81 +48,82 @@ def save_stat(q_id, correct, confidence, reason):
         st.error(f"Save error: {e}")
         return False
 
-# --- 5. PDF RAPORU (DÜZELTİLMİŞ VE HATASIZ) ---
+# --- 5. PDF RAPORU FONKSİYONU ---
 def create_error_report(stats_df, questions_df):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Helvetica", "B", 16)
     pdf.cell(0, 10, "Wrong Answers & Analysis Report", ln=True, align='C')
     pdf.ln(10)
-    
-    # Verileri normalize et
     stats_df['is_correct'] = stats_df['is_correct'].astype(str).str.upper().replace({'0': 'FALSE', '1': 'TRUE'})
     wrong_stats = stats_df[(stats_df['is_correct'] == "FALSE") | (stats_df['confidence_level'] == "Guessed")]
-    
     if wrong_stats.empty:
         pdf.set_font("Helvetica", "", 12)
-        pdf.cell(0, 10, "No errors found to report.", ln=True)
+        pdf.cell(0, 10, "No errors found.", ln=True)
     else:
         for _, row in wrong_stats.iterrows():
             q_info = questions_df[questions_df['id'].astype(str) == str(row['question_id'])]
             if not q_info.empty:
                 q_text = str(q_info['content_text'].values[0])
                 ans = str(q_info['correct_option'].values[0])
-                
-                # Soru metni (Hata çözümü için genişlik kısıtlandı)
                 pdf.set_font("Helvetica", "B", 10)
                 pdf.multi_cell(180, 7, f"Question: {q_text}") 
-                
-                # Detaylar
                 pdf.set_font("Helvetica", "", 9)
-                details = f"Correct Answer: {ans} | Reason: {row['error_reason']} | Date: {row['attempt_date']}"
-                pdf.multi_cell(180, 7, details) 
-                pdf.ln(2)
+                pdf.multi_cell(180, 7, f"Correct Answer: {ans} | Reason: {row['error_reason']}") 
+                pdf.ln(5)
                 pdf.line(10, pdf.get_y(), 200, pdf.get_y())
                 pdf.ln(5)
-                
                 if pdf.get_y() > 250: pdf.add_page()
-    
     return bytes(pdf.output())
 
-# --- 6. NAVİGASYON ---
+# --- 6. NAVİGASYON (SIDEBAR) ---
 with st.sidebar:
     st.title("🏆 Control Center")
-    if st.button("📝 Start 10-Min Sprint"):
-        questions = conn.read(worksheet="Questions", ttl=0)
-        st.session_state.smart_list = questions.sample(frac=1).reset_index(drop=True)
-        st.session_state.q_idx = 0
-        st.session_state.view = 'Study'
-        st.session_state.start_time = datetime.now()
-        st.rerun()
     
-    if st.button("📊 Performance Analytics"):
-        st.session_state.view = 'Analytics'
-    
-    if st.session_state.view == 'Study':
-        st.write("---")
-        if st.button("🛑 Finish Early"):
+    # Sprint aktifse buton ismini değiştir ve yeniden başlamayı engelle
+    if st.session_state.is_sprint_active:
+        if st.button("▶️ Back to Active Sprint"):
+            st.session_state.view = 'Study'
+            st.rerun()
+        
+        if st.button("🛑 Terminate Sprint"):
+            st.session_state.is_sprint_active = False
+            st.session_state.smart_list = None
+            st.session_state.start_time = None
             st.session_state.view = 'Analytics'
             st.rerun()
+    else:
+        if st.button("📝 Start New 10-Min Sprint"):
+            questions = conn.read(worksheet="Questions", ttl=0)
+            st.session_state.smart_list = questions.sample(frac=1).reset_index(drop=True)
+            st.session_state.q_idx = 0
+            st.session_state.view = 'Study'
+            st.session_state.start_time = datetime.now()
+            st.session_state.is_sprint_active = True
+            st.rerun()
+    
+    st.write("---")
+    if st.button("📊 Global Performance Analytics"):
+        st.session_state.view = 'Analytics'
 
 # --- 7. ÇALIŞMA MODU ---
 if st.session_state.view == 'Study' and st.session_state.smart_list is not None:
-    # Geri Sayım Sayacı [cite: 41, 195-197]
-    if st.session_state.start_time:
-        elapsed = datetime.now() - st.session_state.start_time
-        remaining = timedelta(minutes=10) - elapsed
-        if remaining.total_seconds() > 0:
-            st.markdown(f'<div class="timer-box">⏱️ Time Left: {str(remaining).split(".")[0]}</div>', unsafe_allow_html=True)
-        else:
-            st.session_state.view = 'Analytics'
-            st.rerun()
+    # Süre Kontrolü
+    elapsed = datetime.now() - st.session_state.start_time
+    remaining = timedelta(minutes=10) - elapsed
+    
+    if remaining.total_seconds() <= 0:
+        st.warning("Time is up!")
+        st.session_state.is_sprint_active = False
+        st.session_state.view = 'Analytics'
+        st.rerun()
+    
+    st.markdown(f'<div class="timer-box">⏱️ Remaining Time: {str(remaining).split(".")[0]}</div>', unsafe_allow_html=True)
 
     df = st.session_state.smart_list
     curr = df.iloc[st.session_state.q_idx]
     st.markdown(f'<div class="q-card"><h3>{curr["content_text"]}</h3></div>', unsafe_allow_html=True)
     
-    # 2x2 Şıklar
     col1, col2 = st.columns(2)
     with col1:
         if st.button(f"A) {curr['option_a']}", use_container_width=True): st.session_state.feedback = ('A' == curr['correct_option']); st.session_state.last_q_id = curr['id']
@@ -129,7 +132,6 @@ if st.session_state.view == 'Study' and st.session_state.smart_list is not None:
         if st.button(f"B) {curr['option_b']}", use_container_width=True): st.session_state.feedback = ('B' == curr['correct_option']); st.session_state.last_q_id = curr['id']
         if st.button(f"D) {curr['option_d']}", use_container_width=True): st.session_state.feedback = ('D' == curr['correct_option']); st.session_state.last_q_id = curr['id']
 
-    # Geri Bildirim Butonları
     if st.session_state.feedback is not None:
         if st.session_state.feedback:
             st.success("✅ Correct!")
@@ -143,7 +145,6 @@ if st.session_state.view == 'Study' and st.session_state.smart_list is not None:
             if r2.button("Attention"): save_stat(st.session_state.last_q_id, False, None, "Attention"); st.session_state.q_idx += 1; st.session_state.feedback = None; st.rerun()
             if r3.button("Logic"): save_stat(st.session_state.last_q_id, False, None, "Interpretation"); st.session_state.q_idx += 1; st.session_state.feedback = None; st.rerun()
 
-    # ÖNCEKİ SORU BUTONU (Geri Geldi!) 
     st.write("---")
     if st.button("⬅️ View Previous Question") and st.session_state.q_idx > 0:
         st.session_state.q_idx -= 1
@@ -153,22 +154,22 @@ if st.session_state.view == 'Study' and st.session_state.smart_list is not None:
 # --- 8. ANALİZ ---
 elif st.session_state.view == 'Analytics':
     st.header("📊 Performance Analytics")
+    if st.session_state.is_sprint_active:
+        st.info("💡 You have an active sprint! You can return to it using the sidebar.")
+    
     stats = conn.read(worksheet="User_Stats", ttl=0)
     questions = conn.read(worksheet="Questions", ttl=0)
     
     if not stats.empty:
         stats['is_correct'] = stats['is_correct'].astype(str).str.upper().replace({'0': 'FALSE', '1': 'TRUE'})
-        
         col_pie, col_bar = st.columns(2)
         with col_pie:
-            fig_pie = px.pie(stats, names='is_correct', title="Accuracy Rate", 
-                             color='is_correct', color_discrete_map={'TRUE':'#2ecc71', 'FALSE':'#e74c3c'})
-            st.plotly_chart(fig_pie, use_container_width=True)
-            
+            st.plotly_chart(px.pie(stats, names='is_correct', title="Global Accuracy", 
+                                   color='is_correct', color_discrete_map={'TRUE':'#2ecc71', 'FALSE':'#e74c3c'}), use_container_width=True)
         with col_bar:
-            st.subheader("📋 Download Report")
-            if st.button("Prepare PDF Report"):
+            st.subheader("📋 Reports")
+            if st.button("Prepare PDF Error Report"):
                 report_data = create_error_report(stats, questions)
-                st.download_button(label="📥 Download (PDF)", data=report_data, file_name="analysis.pdf", mime="application/pdf")
+                st.download_button(label="📥 Download", data=report_data, file_name="analysis.pdf", mime="application/pdf")
     else:
         st.info("No data yet.")
