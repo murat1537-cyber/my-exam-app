@@ -7,14 +7,14 @@ from fpdf import FPDF
 
 # --- 1. TOPIC MAPPING (English) ---
 TOPIC_MAP = {
-    "1": "Traffic and Environment",
-    "2": "First Aid Knowledge",
-    "3": "Vehicle Technology",
-    "4": "Traffic Etiquette",
-    "5": "Traffic Signs",
-    "6": "Safe Driving Techniques",
-    "7": "Engine Knowledge",
-    "8": "General Legislation"
+    "1": "Security and Risk Management",
+    "2": "Asset Security",
+    "3": "Security Architecture and Engineering",
+    "4": "Communication and Network Security",
+    "5": "Identity and Access Management (IAM)",
+    "6": "Security Assessment and Testing",
+    "7": "Security Operations",
+    "8": "Software Development Security"
 }
 
 # --- 2. DESIGN & SECURITY ---
