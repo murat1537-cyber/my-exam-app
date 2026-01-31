@@ -27,11 +27,10 @@ if 'feedback' not in st.session_state: st.session_state.feedback = None
 if 'smart_list' not in st.session_state: st.session_state.smart_list = None
 if 'start_time' not in st.session_state: st.session_state.start_time = None
 
-# --- 4. VERİ YAZMA (TUTARLI FORMAT) ---
+# --- 4. VERİ YAZMA (STANDARTLAŞTIRILMIŞ) ---
 def save_stat(q_id, correct, confidence, reason):
     try:
         existing_df = conn.read(worksheet="User_Stats", ttl=0)
-        # Verileri standart TRUE/FALSE metnine dönüştür
         new_row = pd.DataFrame([{
             "user_id": "User_01",
             "question_id": str(q_id),
@@ -47,7 +46,7 @@ def save_stat(q_id, correct, confidence, reason):
         st.error(f"Save error: {e}")
         return False
 
-# --- 5. PDF RAPORU (HATA GİDERİLMİŞ TASARIM) ---
+# --- 5. PDF RAPORU (DÜZELTİLMİŞ VE HATASIZ) ---
 def create_error_report(stats_df, questions_df):
     pdf = FPDF()
     pdf.add_page()
@@ -55,7 +54,7 @@ def create_error_report(stats_df, questions_df):
     pdf.cell(0, 10, "Wrong Answers & Analysis Report", ln=True, align='C')
     pdf.ln(10)
     
-    # Verileri normalize et (0/1 karmaşasını çöz)
+    # Verileri normalize et
     stats_df['is_correct'] = stats_df['is_correct'].astype(str).str.upper().replace({'0': 'FALSE', '1': 'TRUE'})
     wrong_stats = stats_df[(stats_df['is_correct'] == "FALSE") | (stats_df['confidence_level'] == "Guessed")]
     
@@ -69,19 +68,19 @@ def create_error_report(stats_df, questions_df):
                 q_text = str(q_info['content_text'].values[0])
                 ans = str(q_info['correct_option'].values[0])
                 
-                # Soru metni için geniş alan kullan (Hata çözümü)
+                # Soru metni (Hata çözümü için genişlik kısıtlandı)
                 pdf.set_font("Helvetica", "B", 10)
-                pdf.multi_cell(190, 7, f"Question: {q_text}") 
+                pdf.multi_cell(180, 7, f"Question: {q_text}") 
                 
-                # Detaylar için alan
+                # Detaylar
                 pdf.set_font("Helvetica", "", 9)
                 details = f"Correct Answer: {ans} | Reason: {row['error_reason']} | Date: {row['attempt_date']}"
-                pdf.multi_cell(190, 7, details) 
+                pdf.multi_cell(180, 7, details) 
                 pdf.ln(2)
                 pdf.line(10, pdf.get_y(), 200, pdf.get_y())
                 pdf.ln(5)
                 
-                if pdf.get_y() > 260: pdf.add_page()
+                if pdf.get_y() > 250: pdf.add_page()
     
     return bytes(pdf.output())
 
@@ -107,6 +106,7 @@ with st.sidebar:
 
 # --- 7. ÇALIŞMA MODU ---
 if st.session_state.view == 'Study' and st.session_state.smart_list is not None:
+    # Geri Sayım Sayacı [cite: 41, 195-197]
     if st.session_state.start_time:
         elapsed = datetime.now() - st.session_state.start_time
         remaining = timedelta(minutes=10) - elapsed
@@ -120,6 +120,7 @@ if st.session_state.view == 'Study' and st.session_state.smart_list is not None:
     curr = df.iloc[st.session_state.q_idx]
     st.markdown(f'<div class="q-card"><h3>{curr["content_text"]}</h3></div>', unsafe_allow_html=True)
     
+    # 2x2 Şıklar
     col1, col2 = st.columns(2)
     with col1:
         if st.button(f"A) {curr['option_a']}", use_container_width=True): st.session_state.feedback = ('A' == curr['correct_option']); st.session_state.last_q_id = curr['id']
@@ -128,6 +129,7 @@ if st.session_state.view == 'Study' and st.session_state.smart_list is not None:
         if st.button(f"B) {curr['option_b']}", use_container_width=True): st.session_state.feedback = ('B' == curr['correct_option']); st.session_state.last_q_id = curr['id']
         if st.button(f"D) {curr['option_d']}", use_container_width=True): st.session_state.feedback = ('D' == curr['correct_option']); st.session_state.last_q_id = curr['id']
 
+    # Geri Bildirim Butonları
     if st.session_state.feedback is not None:
         if st.session_state.feedback:
             st.success("✅ Correct!")
@@ -141,6 +143,13 @@ if st.session_state.view == 'Study' and st.session_state.smart_list is not None:
             if r2.button("Attention"): save_stat(st.session_state.last_q_id, False, None, "Attention"); st.session_state.q_idx += 1; st.session_state.feedback = None; st.rerun()
             if r3.button("Logic"): save_stat(st.session_state.last_q_id, False, None, "Interpretation"); st.session_state.q_idx += 1; st.session_state.feedback = None; st.rerun()
 
+    # ÖNCEKİ SORU BUTONU (Geri Geldi!) 
+    st.write("---")
+    if st.button("⬅️ View Previous Question") and st.session_state.q_idx > 0:
+        st.session_state.q_idx -= 1
+        st.session_state.feedback = None
+        st.rerun()
+
 # --- 8. ANALİZ ---
 elif st.session_state.view == 'Analytics':
     st.header("📊 Performance Analytics")
@@ -148,7 +157,6 @@ elif st.session_state.view == 'Analytics':
     questions = conn.read(worksheet="Questions", ttl=0)
     
     if not stats.empty:
-        # Görsel tutarlılık için normalize et
         stats['is_correct'] = stats['is_correct'].astype(str).str.upper().replace({'0': 'FALSE', '1': 'TRUE'})
         
         col_pie, col_bar = st.columns(2)
