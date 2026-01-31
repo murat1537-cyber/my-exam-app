@@ -142,15 +142,27 @@ elif st.session_state.view == 'Analytics':
 
             c1, c2 = st.columns([1,2])
             with c1:
-                st.plotly_chart(px.pie(merged, names='is_correct', title="Success Rate", color_discrete_map={'TRUE':'#2ecc71','FALSE':'#e74c3c'}), use_container_width=True)
+                # 1. Genel Başarı Grafiği
+                st.plotly_chart(px.pie(merged, names='is_correct', title="Overall Success Rate", 
+                                       color_discrete_map={'TRUE':'#2ecc71','FALSE':'#e74c3c'}), use_container_width=True)
+                
+                # 2. Hata Analizi Grafiği (YENİ!)
+                error_data = merged[merged['is_correct'] == 'FALSE'].copy()
+                if not error_data.empty:
+                    # 'Interpretation' verisini 'Logic' olarak göster
+                    error_data['error_reason'] = error_data['error_reason'].replace({'Interpretation': 'Logic'})
+                    st.plotly_chart(px.pie(error_data, names='error_reason', title="Error Breakdown", hole=0.4), use_container_width=True)
+                else:
+                    st.success("🎉 No errors recorded yet!")
             
             with c2:
-                # Proficiency Table (No Gradient needed to be safe)
+                # Proficiency Table
                 perf = merged.groupby('Domain')['is_correct'].value_counts(normalize=True).unstack().fillna(0) * 100
                 if 'TRUE' in perf.columns:
                     st.subheader("Success by Domain (%)")
                     st.dataframe(perf[['TRUE']].rename(columns={'TRUE': 'Success %'}).style.format("{:.1f}"), use_container_width=True)
                 
+                # Domain Bar Chart
                 st.plotly_chart(px.bar(merged, x='Domain', color='is_correct', barmode='group', title="Count by Domain"), use_container_width=True)
         else: st.info("No data available yet.")
     except Exception as e: st.error(f"Waiting for data... ({str(e)})")
