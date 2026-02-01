@@ -24,14 +24,16 @@ st.markdown("""
     <style>
     .stApp { background-color: #f4f6f9; }
     .q-card { background: white; padding: 2.5rem; border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-left: 6px solid #2c3e50; margin-bottom: 25px; }
+    
+    /* Profil ve Skor Kartları */
     .profile-card { background: linear-gradient(135deg, #2c3e50 0%, #4ca1af 100%); padding: 20px; border-radius: 15px; color: white; text-align: center; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
-    .profile-rank { font-size: 14px; opacity: 0.9; letter-spacing: 1px; text-transform: uppercase; }
-    .profile-name { font-size: 24px; font-weight: bold; margin: 10px 0; }
+    .result-card { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 20px; color: white; text-align: center; margin: 20px 0; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
+    
     .metric-container { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); text-align: center; border-bottom: 4px solid #3498db; height: 100%; display: flex; flex-direction: column; justify-content: center; }
     .metric-value { font-size: 26px; font-weight: bold; color: #2c3e50; }
     .metric-label { font-size: 13px; color: #7f8c8d; text-transform: uppercase; margin-top: 5px; }
     
-    /* BUTON ÖZELLEŞTİRMELERİ */
+    /* BUTONLAR */
     div.stButton > button[kind="primary"] { background: linear-gradient(45deg, #FF512F 0%, #DD2476 100%); color: white; border: none; border-radius: 10px; transition: all 0.3s ease; }
     div.stButton > button[kind="secondary"] { border-radius: 10px; border: 2px dashed #f39c12; color: #d35400; background-color: #fdf2e9; }
     
@@ -44,13 +46,11 @@ st.markdown("""
 # --- 3. CONNECTION & SESSION STATE ---
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# Oturum Durumları
 defaults = {
     'q_idx': 0, 'view': 'Main', 'feedback': None, 'smart_list': None,
     'start_time': None, 'admin_auth': False, 'is_sprint_active': False,
-    'mode': 'Normal', # Normal / Review
-    'sprint_type': 'Time', # Time / Count
-    'sprint_target': 600 # Saniye veya Soru Sayısı
+    'mode': 'Normal', 'sprint_type': 'Time', 'sprint_target': 600,
+    'sprint_score': 0, 'sprint_total_attempted': 0 # Yeni skor değişkenleri
 }
 for k, v in defaults.items():
     if k not in st.session_state: st.session_state[k] = v
@@ -58,6 +58,7 @@ for k, v in defaults.items():
 # --- 4. DATA FUNCTIONS ---
 def save_stat(q_id, correct, confidence, reason):
     try:
+        # User Stats anlık yazılmalı, cache (ttl) kullanılmaz
         existing_df = conn.read(worksheet="User_Stats", ttl=0)
         new_row = pd.DataFrame([{
             "user_id": "User_01", "question_id": str(q_id),
@@ -78,8 +79,9 @@ def get_user_rank(df):
     else: return "👑 CISO Master", count
 
 def prepare_sprint_data(selected_domain):
-    """Veriyi seçilen domaine göre filtreleyip hazırlar"""
-    q_df = conn.read(worksheet="Questions", ttl=0)
+    # CRITICAL FIX: ttl=600 (10 mins cache) prevents "Quota Exceeded" error
+    q_df = conn.read(worksheet="Questions", ttl=600)
+    
     if selected_domain != "All Domains (Mix)":
         target_id = [k for k, v in TOPIC_MAP.items() if v == selected_domain][0]
         q_df = q_df[q_df['topic_id'].astype(str).str.split('.').str[0] == target_id]
@@ -89,6 +91,7 @@ def prepare_sprint_data(selected_domain):
 with st.sidebar:
     # --- Profil ---
     try:
+        # Cache profile stats for 1 minute
         stats_preview = conn.read(worksheet="User_Stats", ttl=60)
         rank, total_q = get_user_rank(stats_preview)
     except: rank, total_q = "Novice", 0
@@ -117,7 +120,6 @@ with st.sidebar:
         st.write("---")
         st.write("🚀 **Start New Sprint:**")
         
-        # YENİ SPRINT OPSİYONLARI (Grid)
         c1, c2 = st.columns(2)
         
         # 10 Min Time Sprint
@@ -128,7 +130,8 @@ with st.sidebar:
                 st.session_state.q_idx = 0; st.session_state.start_time = time.time()
                 st.session_state.is_sprint_active = True; st.session_state.view = 'Study'
                 st.session_state.mode = 'Normal'
-                st.session_state.sprint_type = 'Time'; st.session_state.sprint_target = 600 # 600 sn
+                st.session_state.sprint_type = 'Time'; st.session_state.sprint_target = 600
+                st.session_state.sprint_score = 0; st.session_state.sprint_total_attempted = 0
                 st.rerun()
             else: st.error("No questions.")
 
@@ -140,21 +143,22 @@ with st.sidebar:
                 st.session_state.q_idx = 0; st.session_state.start_time = time.time()
                 st.session_state.is_sprint_active = True; st.session_state.view = 'Study'
                 st.session_state.mode = 'Normal'
-                st.session_state.sprint_type = 'Time'; st.session_state.sprint_target = 300 # 300 sn
+                st.session_state.sprint_type = 'Time'; st.session_state.sprint_target = 300
+                st.session_state.sprint_score = 0; st.session_state.sprint_total_attempted = 0
                 st.rerun()
             else: st.error("No questions.")
             
-        # 10 Question Count Sprint
+        # 10 Question Sprint
         if st.button("📝 Ask me 10 Questions", use_container_width=True):
             q_df = prepare_sprint_data(selected_mode)
             if not q_df.empty:
-                # Tam 10 tane çek, yoksa hepsini çek
                 count = min(len(q_df), 10)
                 st.session_state.smart_list = q_df.sample(n=count).reset_index(drop=True)
                 st.session_state.q_idx = 0; st.session_state.start_time = time.time()
                 st.session_state.is_sprint_active = True; st.session_state.view = 'Study'
                 st.session_state.mode = 'Normal'
                 st.session_state.sprint_type = 'Count'; st.session_state.sprint_target = count
+                st.session_state.sprint_score = 0; st.session_state.sprint_total_attempted = 0
                 st.rerun()
             else: st.error("No questions.")
 
@@ -162,13 +166,13 @@ with st.sidebar:
         st.write("")
         if st.button("↺ Review Mistakes", type="secondary", use_container_width=True):
             try:
-                stats_df = conn.read(worksheet="User_Stats", ttl=0)
+                stats_df = conn.read(worksheet="User_Stats", ttl=0) # Stats needs fresh data
                 stats_df['is_correct_bool'] = stats_df['is_correct'].astype(str).str.upper().replace({'0':False,'1':True,'FALSE':False,'TRUE':True,'0.0':False})
                 wrong_ids = stats_df[stats_df['is_correct_bool'] == False]['question_id'].unique()
                 
                 if len(wrong_ids) == 0: st.success("No errors!")
                 else:
-                    all_q = conn.read(worksheet="Questions", ttl=0)
+                    all_q = conn.read(worksheet="Questions", ttl=600) # Cache questions
                     clean_wrong_ids = [str(x).split('.')[0] for x in wrong_ids]
                     all_q['clean_id'] = all_q['id'].astype(str).str.split('.').str[0]
                     review_list = all_q[all_q['clean_id'].isin(clean_wrong_ids)]
@@ -179,8 +183,8 @@ with st.sidebar:
                         st.session_state.q_idx = 0; st.session_state.start_time = time.time()
                         st.session_state.is_sprint_active = True; st.session_state.view = 'Study'
                         st.session_state.mode = 'Review'
-                        # Hata modu genelde soru sayısına göre bitsin
                         st.session_state.sprint_type = 'Count'; st.session_state.sprint_target = count
+                        st.session_state.sprint_score = 0; st.session_state.sprint_total_attempted = 0
                         st.rerun()
             except: st.error("Review Error")
 
@@ -188,21 +192,41 @@ with st.sidebar:
     if st.button("📊 Analytics"): st.session_state.view = 'Analytics'
     if st.button("🔑 Admin"): st.session_state.view = 'Admin'
 
-# --- 6. STUDY VIEW ---
-if st.session_state.view == 'Study' and st.session_state.smart_list is not None:
-    # --- ÜST BİLGİ ÇUBUĞU (Timer veya Sayaç) ---
-    ph = st.empty()
+# --- 6. VIEWS CONTROL ---
+
+# A. SCORE SUMMARY VIEW (YENİ!)
+if st.session_state.view == 'Score_Summary':
+    # Skor Hesaplama
+    score = st.session_state.sprint_score
+    total = st.session_state.sprint_total_attempted
+    accuracy = (score / total * 100) if total > 0 else 0
     
-    # Logic: Time vs Count
+    st.markdown(f"""
+    <div class="result-card">
+        <h1>🏁 Sprint Complete!</h1>
+        <div style="font-size: 60px; font-weight: bold; margin: 20px 0;">{score} / {total}</div>
+        <h3>Accuracy: {accuracy:.1f}%</h3>
+        <p>Great job! Every interaction makes you stronger.</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    col1, col2 = st.columns(2)
+    if col1.button("📊 Go to Dashboard", use_container_width=True):
+        st.session_state.view = 'Analytics'; st.rerun()
+    if col2.button("🔁 Start New Sprint", use_container_width=True):
+        st.session_state.view = 'Main'; st.session_state.is_sprint_active = False; st.rerun()
+
+# B. STUDY VIEW
+elif st.session_state.view == 'Study' and st.session_state.smart_list is not None:
+    # --- ÜST BİLGİ ÇUBUĞU ---
+    ph = st.empty()
     should_end = False
     
     if st.session_state.sprint_type == 'Time':
-        # Zaman Bazlı
         rem = max(0, int(st.session_state.sprint_target - (time.time() - st.session_state.start_time)))
         if rem <= 0: should_end = True
         ph.markdown(f'<div class="timer-box">⏱️ {rem//60:02d}:{rem%60:02d}</div>', unsafe_allow_html=True)
     else:
-        # Soru Sayısı Bazlı
         current = st.session_state.q_idx + 1
         total = st.session_state.sprint_target
         if current > total: should_end = True
@@ -210,10 +234,11 @@ if st.session_state.view == 'Study' and st.session_state.smart_list is not None:
             ph.markdown(f'<div class="progress-box">📝 Question {current} / {total}</div>', unsafe_allow_html=True)
 
     if should_end:
-        st.session_state.is_sprint_active = False; st.session_state.view = 'Analytics'; st.rerun()
+        st.session_state.is_sprint_active = False
+        st.session_state.view = 'Score_Summary' # Analiz yerine Özet'e git
+        st.rerun()
 
     # --- SORU KARTI ---
-    # Soru listesi bitmiş mi kontrolü (Count modunda index taşabilir)
     if st.session_state.q_idx < len(st.session_state.smart_list):
         curr = st.session_state.smart_list.iloc[st.session_state.q_idx]
         topic_name = TOPIC_MAP.get(str(curr['topic_id']).split('.')[0], 'General')
@@ -233,6 +258,9 @@ if st.session_state.view == 'Study' and st.session_state.smart_list is not None:
                 if st.button(f"{code}) {curr[col]}", use_container_width=True):
                     st.session_state.feedback = (code == curr['correct_option'])
                     st.session_state.last_q_id = curr['id']
+                    # Skor Güncelleme
+                    if st.session_state.feedback: st.session_state.sprint_score += 1
+                    st.session_state.sprint_total_attempted += 1
                     st.rerun()
 
         if st.session_state.feedback is not None:
@@ -263,15 +291,15 @@ if st.session_state.view == 'Study' and st.session_state.smart_list is not None:
                     save_stat(st.session_state.last_q_id, False, "None", "Interpretation")
                     st.session_state.q_idx += 1; st.session_state.feedback = None; st.rerun()
     else:
-        # Liste bittiyse analize at
-        st.session_state.is_sprint_active = False; st.session_state.view = 'Analytics'; st.rerun()
+        st.session_state.is_sprint_active = False; st.session_state.view = 'Score_Summary'; st.rerun()
 
-# --- 7. ANALYTICS VIEW ---
+# C. ANALYTICS VIEW
 elif st.session_state.view == 'Analytics':
     st.header("📊 Intelligence Dashboard")
     try:
-        stats = conn.read(worksheet="User_Stats", ttl=0)
-        questions = conn.read(worksheet="Questions", ttl=0)
+        # Analytics reads can also be cached lightly if quota is tight
+        stats = conn.read(worksheet="User_Stats", ttl=0) 
+        questions = conn.read(worksheet="Questions", ttl=600)
         
         if not stats.empty and not questions.empty:
             stats['qid'] = stats['question_id'].astype(str).str.split('.').str[0]
@@ -312,7 +340,7 @@ elif st.session_state.view == 'Analytics':
         else: st.info("No data.")
     except Exception as e: st.error(str(e))
 
-# --- 8. ADMIN VIEW ---
+# D. ADMIN VIEW
 elif st.session_state.view == 'Admin':
     if not st.session_state.admin_auth:
         if st.text_input("Admin Code", type="password") == "1234": st.session_state.admin_auth = True; st.rerun()
@@ -321,7 +349,7 @@ elif st.session_state.view == 'Admin':
         up = st.file_uploader("Questions (.xlsx)", type=['xlsx'])
         if up and st.button("Sync"):
             try:
-                c = conn.read(worksheet="Questions", ttl=0)
+                c = conn.read(worksheet="Questions", ttl=0) # Sync needs fresh data
                 n = pd.read_excel(up)
                 conn.update(worksheet="Questions", data=pd.concat([c, n], ignore_index=True))
                 st.success("Synced.")
