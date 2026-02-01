@@ -7,7 +7,7 @@ import time
 import hashlib
 import secrets
 import re
-import urllib.parse  # Google araması için link oluştururken gerekli
+import urllib.parse
 
 # --- 1. CISSP DOMAIN MAPPING ---
 TOPIC_MAP = {
@@ -21,86 +21,49 @@ TOPIC_MAP = {
     "8": "Software Development Security"
 }
 
-# --- 2. CONFIGURATION & HIGH CONTRAST CSS ---
+# --- 2. CONFIGURATION & CSS ---
 st.set_page_config(page_title="CISSP AI Mentor", page_icon="🛡️", layout="wide")
 
 st.markdown("""
     <style>
     .stApp { background-color: #f4f6f9; }
     
-    /* --- 1. SORU ŞIKLARI (VARSAYILAN BUTONLAR) --- */
+    /* BUTONLAR */
     div.stButton > button {
-        width: 100%; 
-        border-radius: 12px !important; 
-        border: 2px solid #d1d8e0 !important; 
-        padding: 15px 20px !important; 
-        font-size: 20px !important; 
-        font-weight: 600 !important;
-        background-color: #ffffff !important; 
-        color: #000000 !important; 
-        min-height: 85px; 
-        white-space: normal !important; 
-        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-        text-align: left !important; 
-        transition: all 0.2s ease;
-        line-height: 1.5 !important;
+        width: 100%; border-radius: 12px !important; border: 2px solid #d1d8e0 !important;
+        padding: 15px 20px !important; font-size: 20px !important; font-weight: 600 !important;
+        background-color: #ffffff !important; color: #000000 !important;
+        min-height: 85px; white-space: normal !important; box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        text-align: left !important; transition: all 0.2s ease; line-height: 1.5 !important;
     }
+    div.stButton > button:hover { border-color: #3498db !important; background-color: #f0f8ff !important; color: #000000 !important; transform: translateY(-2px); }
     
-    div.stButton > button:hover { 
-        border-color: #3498db !important; 
-        background-color: #f0f8ff !important; 
-        color: #000000 !important; 
-        transform: translateY(-2px);
-    }
-    
-    /* --- 2. AKSİYON BUTONLARI (Primary) --- */
     div.stButton > button[kind="primary"] {
         background: linear-gradient(135deg, #FF6B6B 0%, #EE5253 100%) !important;
-        color: white !important; 
-        border: none !important;
-        text-align: center !important; 
-        font-weight: 700 !important;
+        color: white !important; border: none !important; text-align: center !important; font-weight: 700 !important;
     }
-    
-    /* --- 3. NAVİGASYON BUTONLARI (Secondary) --- */
     div.stButton > button[kind="secondary"] {
-        background-color: #dfe6e9 !important;
-        color: #2d3436 !important;
-        border: 1px solid #b2bec3 !important;
-        text-align: center !important;
-        font-size: 18px !important;
+        background-color: #dfe6e9 !important; color: #2d3436 !important;
+        border: 1px solid #b2bec3 !important; text-align: center !important; font-size: 18px !important;
     }
 
+    /* KARTLAR */
     .q-card { background: white; padding: 35px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); border-top: 6px solid #2c3e50; margin-bottom: 25px; }
     .q-card h3 { font-size: 24px !important; line-height: 1.5 !important; color: #000000 !important; font-weight: 700 !important; }
     .profile-card { background: white; padding: 20px; border-radius: 15px; text-align: center; border: 1px solid #eee; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.03); }
     .login-wrapper { background: white; padding: 40px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); border: 1px solid #f0f0f0; text-align: center; margin-top: 50px; }
     .login-title { font-size: 28px; font-weight: 800; color: #2c3e50; margin-bottom: 10px; }
+    
+    /* DASHBOARD */
     .metric-card { background: white; padding: 20px; border-radius: 12px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.05); height: 100%; border-bottom: 4px solid #3498db; }
     .metric-num { font-size: 28px; font-weight: 800; color: #2c3e50; }
     .metric-lbl { font-size: 12px; text-transform: uppercase; color: #95a5a6; letter-spacing: 1px; margin-top: 5px; }
     .timer-box { font-size: 22px; font-weight: 800; color: #e74c3c; text-align: center; background: white; border-radius: 10px; padding: 12px; margin-bottom: 20px; border: 2px solid #fab1a0; }
     .explanation-box { background-color: #e3fcf7; padding: 20px; border-radius: 12px; border-left: 5px solid #00b894; margin-top: 20px; color: #000000; font-size: 18px !important; line-height: 1.6; }
     
-    /* AI Buton Stili (Linkler için) */
-    .ai-btn {
-        width: 100%;
-        background-color: #e3f2fd;
-        border: 1px solid #90caf9;
-        color: #1565c0;
-        padding: 12px;
-        border-radius: 8px;
-        text-align: center;
-        text-decoration: none;
-        display: inline-block;
-        font-weight: bold;
-        font-size: 16px;
-        transition: all 0.3s;
-    }
-    .ai-btn:hover {
-        background-color: #bbdefb;
-        transform: translateY(-2px);
-    }
+    /* AI Buton */
+    .ai-btn { width: 100%; background-color: #e3f2fd; border: 1px solid #90caf9; color: #1565c0; padding: 12px; border-radius: 8px; text-align: center; text-decoration: none; display: inline-block; font-weight: bold; font-size: 16px; transition: all 0.3s; }
+    .ai-btn:hover { background-color: #bbdefb; transform: translateY(-2px); }
     </style>
     """, unsafe_allow_html=True)
 
@@ -165,11 +128,9 @@ def register_new_user(username, email, password, gdpr):
         if clean_user in users['username'].astype(str).str.strip().values: return False, "Username exists!"
     
     secure_password = hash_password(password.strip())
-    
     new_user = pd.DataFrame([{
         "username": clean_user, "email": clean_email, "password": secure_password,
-        "is_2fa_enabled": "FALSE", "gdpr_consent": "TRUE" if gdpr else "FALSE",
-        "role": "User"
+        "is_2fa_enabled": "FALSE", "gdpr_consent": "TRUE" if gdpr else "FALSE", "role": "User"
     }])
     updated_users = pd.concat([users, new_user], ignore_index=True)
     conn.update(worksheet="Users", data=updated_users)
@@ -178,7 +139,6 @@ def register_new_user(username, email, password, gdpr):
 def verify_login(username, password):
     users = get_all_users()
     if users.empty: return False, None
-    
     input_user = str(username).strip()
     users['username_clean'] = users['username'].astype(str).str.strip()
     user_record = users[users['username_clean'] == input_user]
@@ -189,8 +149,48 @@ def verify_login(username, password):
             role = user_record.iloc[0].get('role', 'User')
             if pd.isna(role) or str(role).strip() == '': role = 'User'
             return True, str(role).strip()
-            
     return False, None
+
+# --- YENİ EKLENEN PROFİL YÖNETİM FONKSİYONLARI ---
+def update_user_email(username, new_email):
+    users = get_all_users()
+    clean_new_email = sanitize_input(new_email)
+    
+    # Kullanıcı satırını bul
+    users['username_clean'] = users['username'].astype(str).str.strip()
+    idx = users.index[users['username_clean'] == username].tolist()
+    
+    if idx:
+        users.at[idx[0], 'email'] = clean_new_email
+        # Geçici sütunu silip kaydet
+        if 'username_clean' in users.columns: users = users.drop(columns=['username_clean'])
+        conn.update(worksheet="Users", data=users)
+        return True, "Email updated successfully."
+    return False, "User not found."
+
+def update_user_password(username, current_password, new_password):
+    users = get_all_users()
+    users['username_clean'] = users['username'].astype(str).str.strip()
+    idx = users.index[users['username_clean'] == username].tolist()
+    
+    if not idx: return False, "User not found."
+    
+    # 1. Mevcut şifreyi doğrula (Güvenlik)
+    stored_pass = users.at[idx[0], 'password']
+    if not check_password(stored_pass, current_password):
+        return False, "Current password is incorrect."
+    
+    # 2. Yeni şifre politikası
+    is_valid, msg = validate_password_strength(new_password)
+    if not is_valid: return False, msg
+    
+    # 3. Yeni şifreyi hashle ve kaydet
+    secure_new_pass = hash_password(new_password.strip())
+    users.at[idx[0], 'password'] = secure_new_pass
+    
+    if 'username_clean' in users.columns: users = users.drop(columns=['username_clean'])
+    conn.update(worksheet="Users", data=users)
+    return True, "Password updated successfully."
 
 # --- 5. LOGIN FLOW ---
 if not st.session_state.is_logged_in:
@@ -315,6 +315,12 @@ with st.sidebar:
     if st.button("🏠 Home / Lobby", use_container_width=True, type="secondary"): st.session_state.is_sprint_active = False; st.session_state.view = 'Main'; st.rerun()
     if st.button("📊 Analytics", use_container_width=True, type="secondary"): st.session_state.is_sprint_active = False; st.session_state.view = 'Analytics'; st.rerun()
     
+    # --- YENİ SETTINGS BUTONU ---
+    if st.button("⚙️ Settings", use_container_width=True, type="secondary"): 
+        st.session_state.is_sprint_active = False
+        st.session_state.view = 'Settings'
+        st.rerun()
+        
     if st.session_state.user_role == 'Admin':
         if st.button("🔑 Admin Panel", use_container_width=True, type="primary"): 
             st.session_state.is_sprint_active = False
@@ -342,6 +348,41 @@ if st.session_state.view == 'Main':
         if st.button("📝 10 Questions", type="primary"): start_sprint('Count', 10, dom)
     with c4: 
         if st.button("↺ Review Errors", type="secondary"): start_review()
+
+# --- YENİ SETTINGS VIEW ---
+elif st.session_state.view == 'Settings':
+    st.header("⚙️ Profile Settings")
+    st.markdown("Manage your account details below.")
+    
+    c1, c2 = st.columns(2)
+    
+    with c1:
+        st.markdown("### 📧 Update Email")
+        with st.form("email_update_form"):
+            new_email = st.text_input("New Email Address")
+            if st.form_submit_button("Update Email", type="secondary"):
+                if new_email:
+                    suc, msg = update_user_email(st.session_state.current_user, new_email)
+                    if suc: st.success(msg)
+                    else: st.error(msg)
+                else: st.warning("Please enter an email.")
+    
+    with c2:
+        st.markdown("### 🔒 Change Password")
+        with st.form("pass_update_form"):
+            curr_pass = st.text_input("Current Password", type="password")
+            new_pass = st.text_input("New Password", type="password")
+            confirm_pass = st.text_input("Confirm New Password", type="password")
+            
+            if st.form_submit_button("Change Password", type="primary"):
+                if curr_pass and new_pass and confirm_pass:
+                    if new_pass != confirm_pass:
+                        st.error("New passwords do not match.")
+                    else:
+                        suc, msg = update_user_password(st.session_state.current_user, curr_pass, new_pass)
+                        if suc: st.success(msg)
+                        else: st.error(msg)
+                else: st.warning("All fields are required.")
 
 elif st.session_state.view == 'Study' and st.session_state.smart_list is not None:
     c_back, c_tm, c_ex = st.columns([1, 2, 1])
@@ -377,26 +418,16 @@ elif st.session_state.view == 'Study' and st.session_state.smart_list is not Non
         </div>
         """, unsafe_allow_html=True)
         
-        # --- YENİ EKLENEN AI YARDIM ALANI ---
+        # AI HINT ALANI
         with st.expander("💡 🤖 Need a Hint? (AI & Search Tools)"):
             q_text = curr["content_text"]
-            # Soru metnini URL formatına çevir
             enc_q = urllib.parse.quote(q_text + " CISSP explanation")
-            
             c_h1, c_h2 = st.columns([1, 1])
             with c_h1:
-                # HTML link butonu (st.link_button sürüm sorununu aşmak için)
-                st.markdown(f"""
-                <a href="https://www.google.com/search?q={enc_q}" target="_blank" style="text-decoration:none;">
-                    <div class="ai-btn">🌐 Search on Google</div>
-                </a>
-                """, unsafe_allow_html=True)
-            
+                st.markdown(f"""<a href="https://www.google.com/search?q={enc_q}" target="_blank" style="text-decoration:none;"><div class="ai-btn">🌐 Search on Google</div></a>""", unsafe_allow_html=True)
             with c_h2:
-                # Prompt Hazırlayıcı
                 prompt = f"Please explain this CISSP question and why the correct answer is the right choice:\n\n'{q_text}'\n\nOptions:\nA) {curr['option_a']}\nB) {curr['option_b']}\nC) {curr['option_c']}\nD) {curr['option_d']}"
                 st.text_area("📋 Copy Prompt for ChatGPT/Claude:", value=prompt, height=100)
-        # ------------------------------------
 
         c1, c2 = st.columns(2)
         opts = [('A', 'option_a'), ('B', 'option_b'), ('C', 'option_c'), ('D', 'option_d')]
@@ -447,11 +478,13 @@ elif st.session_state.view == 'Analytics':
             merged = pd.merge(stats, questions[['qid', 'topic_id']], on='qid')
             merged['Domain'] = merged['topic_id'].astype(str).str.split('.').str[0].map(TOPIC_MAP)
             merged['is_correct_val'] = merged['is_correct'].apply(clean_boolean)
+            
             total_int = len(merged); acc = (merged['is_correct_val'].sum() / total_int * 100) if total_int > 0 else 0
             unique_q = merged['qid'].nunique(); cov = (unique_q / len(questions) * 100) if len(questions) > 0 else 0
+            
             k1, k2, k3 = st.columns(3)
             k1.markdown(f'<div class="metric-card"><div class="metric-num">{total_int}</div><div class="metric-lbl">Total Interactions</div></div>', unsafe_allow_html=True)
-            k2.markdown(f'<div class="metric-card"><div class="metric-num">%{acc:.1f}</div><div class="metric-lbl">Accuracy</div></div>', unsafe_allow_html=True)
+            k2.markdown(f'<div class="metric-card"><div class="metric-num">%{acc:.1f}</div><div class="metric-lbl">Overall Accuracy</div></div>', unsafe_allow_html=True)
             k3.markdown(f'<div class="metric-card"><div class="metric-num">{unique_q}</div><div class="metric-lbl">Unique Qs ({cov:.1f}%)</div></div>', unsafe_allow_html=True)
             st.write("---")
             c1, c2 = st.columns([1,2])
