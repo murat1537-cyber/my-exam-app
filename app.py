@@ -17,59 +17,56 @@ TOPIC_MAP = {
     "8": "Software Development Security"
 }
 
-# --- 2. CONFIGURATION & HIGH READABILITY CSS ---
+# --- 2. CONFIGURATION & HIGH CONTRAST CSS ---
 st.set_page_config(page_title="CISSP AI Mentor", page_icon="🛡️", layout="wide")
 
 st.markdown("""
     <style>
-    /* GENEL ARKA PLAN: Gözü yormayan yumuşak gri */
-    .stApp { background-color: #f8f9fa; }
+    /* GENEL ARKA PLAN */
+    .stApp { background-color: #f4f6f9; }
     
-    /* --- 1. SEÇENEK BUTONLARI (VARSAYILAN BUTONLAR) --- */
-    /* A, B, C, D şıkları artık birer "Kart" gibi görünecek */
+    /* --- 1. SORU ŞIKLARI (VARSAYILAN BUTONLAR) --- */
+    /* Burası A, B, C, D şıklarını "Beyaz Kart" gibi yapar */
     div.stButton > button {
         width: 100%; 
         border-radius: 12px !important; 
-        border: 2px solid #e9ecef !important; /* İnce gri çerçeve */
-        padding: 16px 24px !important; /* Geniş iç boşluk */
-        font-size: 20px !important; /* OKUNABİLİR BÜYÜK FONT */
-        font-weight: 500 !important;
-        background-color: #ffffff !important; /* Bembeyaz zemin */
-        color: #212529 !important; /* Koyu antrasit yazı (Maksimum kontrast) */
-        min-height: 85px; /* Yükseklik artırıldı */
+        border: 2px solid #d1d8e0 !important; /* Belirgin gri çerçeve */
+        padding: 15px 20px !important; 
+        font-size: 20px !important; /* BÜYÜK OKUNAKLI FONT */
+        font-weight: 600 !important;
+        background-color: #ffffff !important; /* BEMBEYAZ ZEMİN */
+        color: #000000 !important; /* TAM SİYAH YAZI */
+        min-height: 85px; 
         white-space: normal !important; /* Uzun yazılar alt satıra geçsin */
-        box-shadow: 0 4px 6px rgba(0,0,0,0.02); /* Hafif gölge */
-        text-align: left !important; /* Sola hizalı metin okumayı kolaylaştırır */
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        text-align: left !important; /* ŞIKLARI SOLA YASLA */
+        transition: all 0.2s ease;
         line-height: 1.5 !important;
-        transition: all 0.2s ease-in-out;
     }
     
-    /* Üzerine gelince (Hover) */
+    /* Şıkların üzerine gelince (Hover) */
     div.stButton > button:hover { 
         border-color: #3498db !important; 
-        background-color: #f1f8ff !important; /* Çok açık mavi */
-        color: #2980b9 !important;
+        background-color: #f0f8ff !important; /* Çok açık mavi */
+        color: #000000 !important; 
         transform: translateY(-2px);
-        box-shadow: 0 6px 12px rgba(0,0,0,0.08);
     }
     
-    /* --- 2. AKSİYON BUTONLARI (Primary) --- */
-    /* Login, Start, Next gibi ana butonlar renkli ve ortalı kalacak */
+    /* --- 2. AKSİYON BUTONLARI (Primary - Login, Next vb.) --- */
+    /* Bunlar renkli ve ortalı kalsın ki şıklardan ayrılsın */
     div.stButton > button[kind="primary"] {
-        background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%) !important;
+        background: linear-gradient(135deg, #FF6B6B 0%, #EE5253 100%) !important;
         color: white !important; 
         border: none !important;
-        text-align: center !important; /* Aksiyon butonları ortalı olsun */
+        text-align: center !important; 
         font-weight: 700 !important;
-        font-size: 22px !important;
     }
     
-    /* --- 3. İKİNCİL BUTONLAR (Secondary - Prev/Exit gibi) --- */
-    /* Bunlar da dikkat çeksin ama şıklar kadar büyük olmasın */
+    /* --- 3. NAVİGASYON BUTONLARI (Secondary - Prev, Exit, Logout) --- */
     div.stButton > button[kind="secondary"] {
-        background-color: #e9ecef !important;
-        color: #495057 !important;
-        border: 1px solid #ced4da !important;
+        background-color: #dfe6e9 !important;
+        color: #2d3436 !important;
+        border: 1px solid #b2bec3 !important;
         text-align: center !important;
         font-size: 18px !important;
     }
@@ -77,16 +74,16 @@ st.markdown("""
     /* KART VE METİN DÜZENLEMELERİ */
     .q-card { 
         background: white; 
-        padding: 40px; 
+        padding: 35px; 
         border-radius: 16px; 
-        box-shadow: 0 8px 30px rgba(0,0,0,0.06); 
-        border-top: 8px solid #2c3e50; 
-        margin-bottom: 30px; 
+        box-shadow: 0 4px 20px rgba(0,0,0,0.05); 
+        border-top: 6px solid #2c3e50; 
+        margin-bottom: 25px; 
     }
     .q-card h3 { 
-        font-size: 26px !important; /* Soru metni boyutu */
-        line-height: 1.6 !important; 
-        color: #212529 !important; 
+        font-size: 24px !important; 
+        line-height: 1.5 !important; 
+        color: #000000 !important; /* Soru başlığı da tam siyah */
         font-weight: 700 !important; 
     }
     
@@ -94,24 +91,17 @@ st.markdown("""
     
     .login-wrapper {
         background: white; padding: 40px; border-radius: 20px;
-        box-shadow: 0 10px 40px rgba(0,0,0,0.08); border: 1px solid #f0f0f0;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.08); border: 1px solid #f0f0f0;
         text-align: center; margin-top: 50px;
     }
-    .login-title { font-size: 32px; font-weight: 800; color: #2c3e50; margin-bottom: 10px; }
+    .login-title { font-size: 28px; font-weight: 800; color: #2c3e50; margin-bottom: 10px; }
     
-    .explanation-box { 
-        background-color: #d1e7dd; /* Pastel yeşil */
-        padding: 25px; 
-        border-radius: 12px; 
-        border-left: 6px solid #198754; 
-        margin-top: 25px; 
-        color: #0f5132; 
-        font-size: 18px !important; 
-        line-height: 1.6;
-    }
+    .metric-card { background: white; padding: 20px; border-radius: 12px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.05); height: 100%; border-bottom: 4px solid #3498db; }
+    .metric-num { font-size: 28px; font-weight: 800; color: #2c3e50; }
+    .metric-lbl { font-size: 12px; text-transform: uppercase; color: #95a5a6; letter-spacing: 1px; margin-top: 5px; }
     
-    /* Geri sayım sayacı */
-    .timer-box { font-size: 22px; font-weight: 800; color: #dc3545; text-align: center; background: white; border-radius: 10px; padding: 15px; margin-bottom: 20px; border: 2px solid #f8d7da; }
+    .timer-box { font-size: 22px; font-weight: 800; color: #e74c3c; text-align: center; background: white; border-radius: 10px; padding: 12px; margin-bottom: 20px; border: 2px solid #fab1a0; }
+    .explanation-box { background-color: #e3fcf7; padding: 20px; border-radius: 12px; border-left: 5px solid #00b894; margin-top: 20px; color: #000000; font-size: 18px !important; line-height: 1.6; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -174,7 +164,7 @@ def verify_login(username, password):
 if not st.session_state.is_logged_in:
     c1, c2, c3 = st.columns([1, 1.5, 1])
     with c2:
-        st.markdown("""<div class="login-wrapper"><div style="font-size: 60px;">🛡️</div><div class="login-title">CISSP Mentor Pro</div><div style="color:#6c757d; margin-bottom:30px;">Your AI-Powered Certification Partner</div></div>""", unsafe_allow_html=True)
+        st.markdown("""<div class="login-wrapper"><div style="font-size: 50px;">🛡️</div><div class="login-title">CISSP Mentor Pro</div><div class="login-subtitle">Your AI-Powered Certification Partner</div></div>""", unsafe_allow_html=True)
         tab_login, tab_signup = st.tabs(["🔑 LOGIN", "📝 SIGN UP"])
         
         with tab_login:
@@ -283,11 +273,11 @@ with st.sidebar:
     
     st.markdown(f"""
     <div class="profile-card">
-        <div style="font-size: 40px; margin-bottom:10px;">🛡️</div>
-        <div style="font-weight:800; font-size:22px; color:#2c3e50;">{st.session_state.current_user}</div>
-        <div style="font-size:12px; color:white; background:#34495e; padding:4px 10px; border-radius:12px; display:inline-block; margin-bottom:5px;">{role_badge}</div>
-        <div style="font-size:14px; color:#7f8c8d; margin-top:5px;">{rank}</div>
-        <div style="background:#fff3cd; color:#856404; padding:5px 10px; border-radius:8px; font-weight:bold; font-size:13px; display:inline-block; margin-top:10px;">Total Solved: {total_q}</div>
+        <div style="font-size: 36px; margin-bottom:10px;">🛡️</div>
+        <div style="font-weight:800; font-size:20px; color:#2c3e50;">{st.session_state.current_user}</div>
+        <div style="font-size:11px; color:white; background:#2c3e50; padding:2px 8px; border-radius:10px; display:inline-block; margin-bottom:5px;">{role_badge}</div>
+        <div style="font-size:13px; color:#7f8c8d; text-transform:uppercase; margin-top:5px;">{rank}</div>
+        <div style="background:#eec5a9; color:#d35400; padding:5px 10px; border-radius:15px; font-weight:bold; font-size:12px; display:inline-block; margin-top:10px;">Solved: {total_q}</div>
     </div>
     """, unsafe_allow_html=True)
     
@@ -309,7 +299,7 @@ with st.sidebar:
 # --- VIEWS ---
 if st.session_state.view == 'Main':
     st.title("🛡️ CISSP Mentor Pro")
-    st.markdown(f"### Ready to train, **{st.session_state.current_user}**?")
+    st.markdown(f"**Welcome back, {st.session_state.current_user}!** Let's crush some domains today.")
     dom = st.selectbox("🎯 Target Domain:", ["All Domains (Mix)"] + list(TOPIC_MAP.values()))
     st.write("")
     c1, c2 = st.columns(2)
@@ -361,7 +351,7 @@ elif st.session_state.view == 'Study' and st.session_state.smart_list is not Non
         opts = [('A', 'option_a'), ('B', 'option_b'), ('C', 'option_c'), ('D', 'option_d')]
         for i, (cd, cl) in enumerate(opts):
             with (c1 if i%2==0 else c2):
-                # BURASI KRİTİK: Butonları kart gibi yapıyoruz
+                # BURASI KRİTİK: Butonları kart gibi ve sola yaslı (text-align: left) yapıyoruz
                 if st.button(f"{cd}) {curr[cl]}", use_container_width=True):
                     st.session_state.feedback = (cd == curr['correct_option'])
                     st.session_state.last_q_id = curr['id']
@@ -374,14 +364,12 @@ elif st.session_state.view == 'Study' and st.session_state.smart_list is not Non
                 st.success(f"✅ Correct! Answer: {curr['correct_option']}")
                 if 'explanation' in curr: st.markdown(f'<div class="explanation-box"><b>💡 Insight:</b> {curr["explanation"]}</div>', unsafe_allow_html=True)
                 sc1, sc2 = st.columns(2)
-                # Next butonları belirgin (Primary) olsun
                 if sc1.button("🎯 Sure (Next)", type="primary", use_container_width=True): save_stat(st.session_state.last_q_id, True, "Sure", "None"); st.session_state.q_idx+=1; st.session_state.feedback=None; st.rerun()
                 if sc2.button("🎲 Guess (Next)", type="primary", use_container_width=True): save_stat(st.session_state.last_q_id, True, "Guessed", "None"); st.session_state.q_idx+=1; st.session_state.feedback=None; st.rerun()
             else:
                 st.error(f"❌ Wrong. Correct: {curr['correct_option']}")
                 if 'explanation' in curr: st.markdown(f'<div class="explanation-box"><b>💡 Insight:</b> {curr["explanation"]}</div>', unsafe_allow_html=True)
                 ec1, ec2, ec3 = st.columns(3)
-                # Hata analizi butonları
                 if ec1.button("🧠 Knowledge", type="primary", use_container_width=True): save_stat(st.session_state.last_q_id, False, "None", "Knowledge Gap"); st.session_state.q_idx+=1; st.session_state.feedback=None; st.rerun()
                 if ec2.button("👀 Attention", type="primary", use_container_width=True): save_stat(st.session_state.last_q_id, False, "None", "Attention"); st.session_state.q_idx+=1; st.session_state.feedback=None; st.rerun()
                 if ec3.button("🤔 Logic", type="primary", use_container_width=True): save_stat(st.session_state.last_q_id, False, "None", "Interpretation"); st.session_state.q_idx+=1; st.session_state.feedback=None; st.rerun()
