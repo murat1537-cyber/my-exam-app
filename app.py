@@ -67,7 +67,6 @@ st.markdown("""
 # --- 3. CONNECTION & STATE ---
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# Session State Tanımları (2FA Durumları Eklendi)
 defaults = {
     'is_logged_in': False, 'current_user': None,
     'login_step': 'credentials', # 'credentials' veya '2fa'
@@ -259,6 +258,9 @@ def start_review():
 
 # --- SIDEBAR ---
 with st.sidebar:
+    # 2FA SETUP MODAL LOGIC
+    if 'show_2fa_setup' not in st.session_state: st.session_state.show_2fa_setup = False
+    
     try:
         stats_p = conn.read(worksheet="User_Stats", ttl=60)
         rank, total_q = get_user_rank(stats_p)
@@ -426,5 +428,7 @@ elif st.session_state.view == 'Admin':
         st.subheader("Data Sync")
         up = st.file_uploader("Questions (.xlsx)", type=['xlsx'])
         if up and st.button("Sync"):
-            c = conn.read(worksheet="Questions", ttl=0); n = pd.read_excel(up)
-            conn.update(worksheet="Questions", data=pd.concat([c, n], ignore_index=True)); st.success("Synced.")
+            try:
+                c = conn.read(worksheet="Questions", ttl=0); n = pd.read_excel(up)
+                conn.update(worksheet="Questions", data=pd.concat([c, n], ignore_index=True)); st.success("Synced.")
+            except Exception as e: st.error(e)
