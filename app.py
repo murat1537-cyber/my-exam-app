@@ -17,74 +17,67 @@ TOPIC_MAP = {
     "8": "Software Development Security"
 }
 
-# --- 2. CONFIGURATION & HIGH READABILITY STYLING ---
+# --- 2. CONFIGURATION & ULTRA-READABLE STYLING ---
 st.set_page_config(page_title="CISSP AI Mentor", page_icon="🛡️", layout="wide")
 
 st.markdown("""
     <style>
     .stApp { background-color: #f4f6f9; }
     
-    /* --- BÜYÜK FONT AYARLARI --- */
+    /* --- 1. BUTON VE FONT DEVLEŞTİRME --- */
     
-    /* 1. Soru Kartı Metni */
+    /* Tüm Standart Butonlar (Cevap Şıkları Dahil) */
+    div.stButton > button {
+        font-size: 22px !important;    /* Cevap şıklarını büyüt */
+        height: 3.5em !important;      /* Yüksekliği artır */
+        font-weight: 600 !important;
+        border-radius: 12px !important;
+        border: 1px solid #bdc3c7;
+    }
+    
+    /* "Start Sprint" gibi Primary Butonlar */
+    div.stButton > button[kind="primary"] {
+        background: linear-gradient(45deg, #FF512F 0%, #DD2476 100%);
+        color: white;
+        border: none;
+        height: 100px !important;      /* Daha da yüksek */
+        font-size: 26px !important;    /* Çok büyük yazı */
+        font-weight: 800 !important;
+        box-shadow: 0 8px 15px rgba(0,0,0,0.1);
+    }
+
+    /* "Review Mistakes" gibi Secondary Butonlar */
+    div.stButton > button[kind="secondary"] {
+        border: 3px dashed #f39c12;
+        color: #d35400;
+        background-color: #fdf2e9;
+        font-size: 22px !important;
+        height: 80px !important;
+    }
+
+    /* --- 2. KART TASARIMLARI --- */
     .q-card { 
         background: white; 
-        padding: 3rem; /* Daha geniş boşluk */
-        border-radius: 15px; 
-        box-shadow: 0 4px 6px rgba(0,0,0,0.05); 
-        border-left: 8px solid #2c3e50; 
+        padding: 3rem; 
+        border-radius: 20px; 
+        box-shadow: 0 5px 15px rgba(0,0,0,0.05); 
+        border-left: 10px solid #2c3e50; 
         margin-bottom: 30px; 
     }
     .q-card h3 {
-        font-size: 28px !important; /* Soru metni büyütüldü */
-        line-height: 1.6 !important;
-        font-weight: 700 !important;
+        font-size: 32px !important;    /* Soru metni DEVASA */
+        line-height: 1.5 !important;
         color: #2c3e50 !important;
     }
     
-    /* 2. Cevap Şıkkı Butonları */
-    div.stButton > button {
-        font-size: 20px !important; /* Şık yazıları büyütüldü */
-        height: 4.5em !important; /* Buton yüksekliği artırıldı */
-        font-weight: 600 !important;
-    }
-    
-    /* 3. Özel Butonlar (Primary & Secondary) */
-    div.stButton > button[kind="primary"] { 
-        background: linear-gradient(45deg, #FF512F 0%, #DD2476 100%); 
-        color: white; 
-        border: none; 
-        border-radius: 12px;
-        font-size: 22px !important; /* Start butonları daha da büyük */
-    }
-    div.stButton > button[kind="secondary"] { 
-        border-radius: 12px; 
-        border: 2px dashed #f39c12; 
-        color: #d35400; 
-        background-color: #fdf2e9; 
-        font-size: 18px !important;
-    }
-    
-    /* Diğer Bileşenler */
-    .profile-card { background: linear-gradient(135deg, #2c3e50 0%, #4ca1af 100%); padding: 20px; border-radius: 15px; color: white; text-align: center; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+    .profile-card { background: linear-gradient(135deg, #2c3e50 0%, #4ca1af 100%); padding: 25px; border-radius: 20px; color: white; text-align: center; margin-bottom: 25px; }
     .result-card { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px; border-radius: 20px; color: white; text-align: center; margin: 20px 0; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
-    .metric-container { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); text-align: center; border-bottom: 4px solid #3498db; height: 100%; display: flex; flex-direction: column; justify-content: center; }
-    .metric-value { font-size: 26px; font-weight: bold; color: #2c3e50; }
     
-    .timer-box { font-size: 26px; font-weight: 800; color: #e74c3c; text-align: center; background: #fadbd8; border-radius: 10px; padding: 15px; margin-bottom: 25px; }
-    .progress-box { font-size: 24px; font-weight: 800; color: #2980b9; text-align: center; background: #d6eaf8; border-radius: 10px; padding: 15px; margin-bottom: 25px; }
-    
-    /* Açıklama Kutusu (Explanation) */
-    .explanation-box { 
-        background-color: #e8f6f3; 
-        padding: 25px; 
-        border-radius: 10px; 
-        border-left: 6px solid #1abc9c; 
-        margin-top: 20px; 
-        color: #16a085; 
-        font-size: 20px !important; /* Açıklama yazısı büyütüldü */
-        line-height: 1.6;
-    }
+    /* --- 3. DİĞER DETAYLAR --- */
+    .metric-container { background: white; padding: 20px; border-radius: 15px; text-align: center; border-bottom: 5px solid #3498db; }
+    .metric-value { font-size: 32px; font-weight: bold; color: #2c3e50; }
+    .explanation-box { background-color: #e8f6f3; padding: 25px; border-radius: 15px; border-left: 8px solid #1abc9c; margin-top: 20px; color: #16a085; font-size: 20px !important; }
+    .timer-box { font-size: 28px; font-weight: 800; color: #e74c3c; text-align: center; background: #fadbd8; border-radius: 12px; padding: 15px; margin-bottom: 25px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -100,9 +93,10 @@ defaults = {
 for k, v in defaults.items():
     if k not in st.session_state: st.session_state[k] = v
 
-# --- 4. DATA FUNCTIONS ---
+# --- 4. DATA FUNCTIONS (QUOTA FIX) ---
 def save_stat(q_id, correct, confidence, reason):
     try:
+        # User_Stats anlık yazma gerektirir, önbellek (TTL) olmaz
         existing_df = conn.read(worksheet="User_Stats", ttl=0)
         new_row = pd.DataFrame([{
             "user_id": "User_01", "question_id": str(q_id),
@@ -112,7 +106,8 @@ def save_stat(q_id, correct, confidence, reason):
         }])
         updated_df = pd.concat([existing_df, new_row], ignore_index=True).dropna(how='all')
         conn.update(worksheet="User_Stats", data=updated_df)
-    except: pass 
+    except Exception as e:
+        st.warning(f"Bağlantı yoğunluğu nedeniyle istatistik kaydedilemedi. Devam edin. ({str(e)})")
 
 def get_user_rank(df):
     if df.empty: return "Novice", 0
@@ -123,7 +118,10 @@ def get_user_rank(df):
     else: return "👑 CISO Master", count
 
 def prepare_sprint_data(selected_domain):
+    # KRİTİK DÜZELTME: Questions sayfası 10 dakika (600sn) önbellekte tutulur.
+    # Bu, "Quota Exceeded" hatasını engeller.
     q_df = conn.read(worksheet="Questions", ttl=600)
+    
     if selected_domain != "All Domains (Mix)":
         target_id = [k for k, v in TOPIC_MAP.items() if v == selected_domain][0]
         q_df = q_df[q_df['topic_id'].astype(str).str.split('.').str[0] == target_id]
@@ -132,6 +130,7 @@ def prepare_sprint_data(selected_domain):
 # --- 5. SIDEBAR ---
 with st.sidebar:
     try:
+        # Profil verisini 1 dakika cache'le
         stats_preview = conn.read(worksheet="User_Stats", ttl=60)
         rank, total_q = get_user_rank(stats_preview)
     except: rank, total_q = "Novice", 0
@@ -141,7 +140,7 @@ with st.sidebar:
         <div style="font-size: 40px;">🛡️</div>
         <div class="profile-name">Cyber Warrior</div>
         <div class="profile-rank">{rank}</div>
-        <div style="margin-top:10px; font-size:12px;">Questions Solved: {total_q}</div>
+        <div style="margin-top:10px; font-size:14px;">Questions Solved: {total_q}</div>
     </div>
     """, unsafe_allow_html=True)
     
@@ -157,7 +156,7 @@ with st.sidebar:
         selected_mode = st.selectbox("Domain:", domain_options)
         
         st.write("---")
-        st.write("🚀 **Start New Sprint:**")
+        st.markdown("### 🚀 Start New Sprint")
         
         c1, c2 = st.columns(2)
         if c1.button("⏱️ 10 Min", type="primary", use_container_width=True):
@@ -170,7 +169,7 @@ with st.sidebar:
                 st.session_state.sprint_type = 'Time'; st.session_state.sprint_target = 600
                 st.session_state.sprint_score = 0; st.session_state.sprint_total_attempted = 0
                 st.rerun()
-            else: st.error("No questions.")
+            else: st.error("No questions found.")
 
         if c2.button("⚡ 5 Min", type="primary", use_container_width=True):
             q_df = prepare_sprint_data(selected_mode)
@@ -182,7 +181,7 @@ with st.sidebar:
                 st.session_state.sprint_type = 'Time'; st.session_state.sprint_target = 300
                 st.session_state.sprint_score = 0; st.session_state.sprint_total_attempted = 0
                 st.rerun()
-            else: st.error("No questions.")
+            else: st.error("No questions found.")
             
         if st.button("📝 Ask me 10 Questions", use_container_width=True):
             q_df = prepare_sprint_data(selected_mode)
@@ -195,7 +194,7 @@ with st.sidebar:
                 st.session_state.sprint_type = 'Count'; st.session_state.sprint_target = count
                 st.session_state.sprint_score = 0; st.session_state.sprint_total_attempted = 0
                 st.rerun()
-            else: st.error("No questions.")
+            else: st.error("No questions found.")
 
         st.write("")
         if st.button("↺ Review Mistakes", type="secondary", use_container_width=True):
@@ -204,7 +203,7 @@ with st.sidebar:
                 stats_df['is_correct_bool'] = stats_df['is_correct'].astype(str).str.upper().replace({'0':False,'1':True,'FALSE':False,'TRUE':True,'0.0':False})
                 wrong_ids = stats_df[stats_df['is_correct_bool'] == False]['question_id'].unique()
                 
-                if len(wrong_ids) == 0: st.success("No errors!")
+                if len(wrong_ids) == 0: st.success("No errors found!")
                 else:
                     all_q = conn.read(worksheet="Questions", ttl=600)
                     clean_wrong_ids = [str(x).split('.')[0] for x in wrong_ids]
@@ -239,7 +238,7 @@ if st.session_state.view == 'Score_Summary':
         <h1>🏁 Sprint Complete!</h1>
         <div style="font-size: 80px; font-weight: bold; margin: 20px 0;">{score} / {total}</div>
         <h3>Accuracy: {accuracy:.1f}%</h3>
-        <p>Great job! Every interaction makes you stronger.</p>
+        <p>Excellent work! Review your analytics for details.</p>
     </div>
     """, unsafe_allow_html=True)
     
@@ -266,9 +265,7 @@ elif st.session_state.view == 'Study' and st.session_state.smart_list is not Non
             ph.markdown(f'<div class="progress-box">📝 Question {current} / {total}</div>', unsafe_allow_html=True)
 
     if should_end:
-        st.session_state.is_sprint_active = False
-        st.session_state.view = 'Score_Summary'
-        st.rerun()
+        st.session_state.is_sprint_active = False; st.session_state.view = 'Score_Summary'; st.rerun()
 
     if st.session_state.q_idx < len(st.session_state.smart_list):
         curr = st.session_state.smart_list.iloc[st.session_state.q_idx]
@@ -277,7 +274,7 @@ elif st.session_state.view == 'Study' and st.session_state.smart_list is not Non
         
         st.markdown(f"""
         <div class="q-card">
-            <div style="color:#7f8c8d; font-size:16px; margin-bottom:15px; font-weight:bold;">{mode_badge}</div>
+            <div style="color:#7f8c8d; font-size:18px; margin-bottom:15px; font-weight:bold;">{mode_badge}</div>
             <h3>{curr["content_text"]}</h3>
         </div>
         """, unsafe_allow_html=True)
@@ -327,8 +324,15 @@ elif st.session_state.view == 'Study' and st.session_state.smart_list is not Non
 elif st.session_state.view == 'Analytics':
     st.header("📊 Intelligence Dashboard")
     try:
-        stats = conn.read(worksheet="User_Stats", ttl=0) 
-        questions = conn.read(worksheet="Questions", ttl=600)
+        # KRİTİK DÜZELTME: User_Stats'ı try-except içine aldık
+        # Questions sayfası 10 dk cache'den gelir (ttl=600), API'yi yormaz.
+        try:
+            stats = conn.read(worksheet="User_Stats", ttl=0)
+        except:
+            st.warning("⚠️ High traffic. Showing cached stats (might be slightly delayed).")
+            stats = conn.read(worksheet="User_Stats", ttl=60) # Failover to cache
+
+        questions = conn.read(worksheet="Questions", ttl=600) 
         
         if not stats.empty and not questions.empty:
             stats['qid'] = stats['question_id'].astype(str).str.split('.').str[0]
