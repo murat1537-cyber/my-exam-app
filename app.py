@@ -51,6 +51,7 @@ st.markdown("""
     .q-card { background: white; padding: 35px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); border-top: 6px solid #2c3e50; margin-bottom: 25px; }
     .q-card h3 { font-size: 24px !important; line-height: 1.5 !important; color: #000000 !important; font-weight: 700 !important; }
     .profile-card { background: white; padding: 20px; border-radius: 15px; text-align: center; border: 1px solid #eee; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.03); }
+    
     .login-wrapper { background: white; padding: 40px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); border: 1px solid #f0f0f0; text-align: center; margin-top: 50px; }
     .login-title { font-size: 28px; font-weight: 800; color: #2c3e50; margin-bottom: 10px; }
     
@@ -61,7 +62,6 @@ st.markdown("""
     .timer-box { font-size: 22px; font-weight: 800; color: #e74c3c; text-align: center; background: white; border-radius: 10px; padding: 12px; margin-bottom: 20px; border: 2px solid #fab1a0; }
     .explanation-box { background-color: #e3fcf7; padding: 20px; border-radius: 12px; border-left: 5px solid #00b894; margin-top: 20px; color: #000000; font-size: 18px !important; line-height: 1.6; }
     
-    /* AI Buton */
     .ai-btn { width: 100%; background-color: #e3f2fd; border: 1px solid #90caf9; color: #1565c0; padding: 12px; border-radius: 8px; text-align: center; text-decoration: none; display: inline-block; font-weight: bold; font-size: 16px; transition: all 0.3s; }
     .ai-btn:hover { background-color: #bbdefb; transform: translateY(-2px); }
     </style>
@@ -82,9 +82,19 @@ for k, v in defaults.items():
 
 # --- 4. SECURITY & AUTH FUNCTIONS ---
 
+SECURITY_QUESTIONS = [
+    "Select a security question...",
+    "What was the name of your first pet?",
+    "In what city were you born?",
+    "What is your mother's maiden name?",
+    "What was the make of your first car?",
+    "What elementary school did you attend?"
+]
+
 def sanitize_input(input_str):
     if not isinstance(input_str, str): return str(input_str)
-    clean = re.sub(r'[^a-zA-Z0-9.@_-]', '', input_str)
+    # Temel karakterler, boşluk ve soru işareti serbest
+    clean = re.sub(r'[^a-zA-Z0-9.@_ \-?]', '', input_str)
     return clean
 
 def validate_password_strength(password):
@@ -110,16 +120,28 @@ def check_password(stored_password, input_password):
         return stored_password == input_password
 
 def get_all_users():
-    try: return conn.read(worksheet="Users", ttl=0)
-    except: return pd.DataFrame(columns=["username", "email", "password", "is_2fa_enabled", "gdpr_consent", "role"])
+    # Güncellenmiş Sütun Yapısı (Security Q/A eklendi)
+    expected_cols = ["username", "email", "password", "is_2fa_enabled", "gdpr_consent", "role", "security_question", "security_answer"]
+    try:
+        df = conn.read(worksheet="Users", ttl=0)
+        # Eksik sütunları tamamla (Eski veri bozulmasın diye)
+        for col in expected_cols:
+            if col not in df.columns:
+                df[col] = "" # Boş string ile doldur
+        return df
+    except:
+        return pd.DataFrame(columns=expected_cols)
 
 def clean_boolean(val):
     return str(val).strip().upper() in ['TRUE', '1', '1.0', 'YES', 'ON']
 
-def register_new_user(username, email, password, gdpr):
+def register_new_user(username, email, password, gdpr, sec_q, sec_a):
     clean_user = sanitize_input(username)
     clean_email = sanitize_input(email)
     
+    if sec_q == SECURITY_QUESTIONS[0] or not sec_a:
+        return False, "Please select and answer a security question."
+
     is_valid_pass, pass_msg = validate_password_strength(password)
     if not is_valid_pass: return False, pass_msg
 
@@ -128,9 +150,14 @@ def register_new_user(username, email, password, gdpr):
         if clean_user in users['username'].astype(str).str.strip().values: return False, "Username exists!"
     
     secure_password = hash_password(password.strip())
+    secure_answer = hash_password(sec_a.strip().lower()) # Cevabı küçük harf yapıp hashle
+    
     new_user = pd.DataFrame([{
         "username": clean_user, "email": clean_email, "password": secure_password,
-        "is_2fa_enabled": "FALSE", "gdpr_consent": "TRUE" if gdpr else "FALSE", "role": "User"
+        "is_2fa_enabled": "FALSE", "gdpr_consent": "TRUE" if gdpr else "FALSE", 
+        "role": "User",
+        "security_question": sec_q,
+        "security_answer": secure_answer
     }])
     updated_users = pd.concat([users, new_user], ignore_index=True)
     conn.update(worksheet="Users", data=updated_users)
@@ -151,18 +178,61 @@ def verify_login(username, password):
             return True, str(role).strip()
     return False, None
 
-# --- YENİ EKLENEN PROFİL YÖNETİM FONKSİYONLARI ---
-def update_user_email(username, new_email):
+# --- ACCOUNT RECOVERY FUNCTIONS ---
+def get_security_question(username):
     users = get_all_users()
-    clean_new_email = sanitize_input(new_email)
+    users['username_clean'] = users['username'].astype(str).str.strip()
+    user_record = users[users['username_clean'] == username]
+    if not user_record.empty:
+        q = user_record.iloc[0].get('security_question', '')
+        if pd.isna(q) or str(q).strip() == '' or q == SECURITY_QUESTIONS[0]:
+            return False, None
+        return True, q
+    return False, None
+
+def reset_password_with_security_answer(username, answer, new_password):
+    users = get_all_users()
+    users['username_clean'] = users['username'].astype(str).str.strip()
+    idx = users.index[users['username_clean'] == username].tolist()
     
-    # Kullanıcı satırını bul
+    if not idx: return False, "User not found."
+    
+    stored_ans = users.at[idx[0], 'security_answer']
+    # Cevabı küçük harf yaparak kontrol et (case-insensitive mantığı)
+    if not check_password(stored_ans, answer.strip().lower()):
+        return False, "Incorrect security answer."
+    
+    is_valid, msg = validate_password_strength(new_password)
+    if not is_valid: return False, msg
+    
+    secure_new_pass = hash_password(new_password.strip())
+    users.at[idx[0], 'password'] = secure_new_pass
+    
+    if 'username_clean' in users.columns: users = users.drop(columns=['username_clean'])
+    conn.update(worksheet="Users", data=users)
+    return True, "Password reset successful! Please login."
+
+def update_security_settings(username, sec_q, sec_a):
+    users = get_all_users()
     users['username_clean'] = users['username'].astype(str).str.strip()
     idx = users.index[users['username_clean'] == username].tolist()
     
     if idx:
+        secure_ans = hash_password(sec_a.strip().lower())
+        users.at[idx[0], 'security_question'] = sec_q
+        users.at[idx[0], 'security_answer'] = secure_ans
+        if 'username_clean' in users.columns: users = users.drop(columns=['username_clean'])
+        conn.update(worksheet="Users", data=users)
+        return True, "Security settings updated."
+    return False, "Error updating settings."
+
+def update_user_email(username, new_email):
+    users = get_all_users()
+    clean_new_email = sanitize_input(new_email)
+    users['username_clean'] = users['username'].astype(str).str.strip()
+    idx = users.index[users['username_clean'] == username].tolist()
+    if idx:
         users.at[idx[0], 'email'] = clean_new_email
-        # Geçici sütunu silip kaydet
         if 'username_clean' in users.columns: users = users.drop(columns=['username_clean'])
         conn.update(worksheet="Users", data=users)
         return True, "Email updated successfully."
@@ -172,32 +242,28 @@ def update_user_password(username, current_password, new_password):
     users = get_all_users()
     users['username_clean'] = users['username'].astype(str).str.strip()
     idx = users.index[users['username_clean'] == username].tolist()
-    
     if not idx: return False, "User not found."
     
-    # 1. Mevcut şifreyi doğrula (Güvenlik)
     stored_pass = users.at[idx[0], 'password']
-    if not check_password(stored_pass, current_password):
-        return False, "Current password is incorrect."
+    if not check_password(stored_pass, current_password): return False, "Current password incorrect."
     
-    # 2. Yeni şifre politikası
     is_valid, msg = validate_password_strength(new_password)
     if not is_valid: return False, msg
     
-    # 3. Yeni şifreyi hashle ve kaydet
     secure_new_pass = hash_password(new_password.strip())
     users.at[idx[0], 'password'] = secure_new_pass
-    
     if 'username_clean' in users.columns: users = users.drop(columns=['username_clean'])
     conn.update(worksheet="Users", data=users)
     return True, "Password updated successfully."
 
-# --- 5. LOGIN FLOW ---
+# --- 5. LOGIN FLOW (RECOVERY EKLENDİ) ---
 if not st.session_state.is_logged_in:
     c1, c2, c3 = st.columns([1, 1.5, 1])
     with c2:
         st.markdown("""<div class="login-wrapper"><div style="font-size: 50px;">🛡️</div><div class="login-title">CISSP Mentor Pro</div><div class="login-subtitle">Your AI-Powered Certification Partner</div></div>""", unsafe_allow_html=True)
-        tab_login, tab_signup = st.tabs(["🔑 LOGIN", "📝 SIGN UP"])
+        
+        # TABLAR: Login, Signup, Recovery
+        tab_login, tab_signup, tab_recover = st.tabs(["🔑 LOGIN", "📝 SIGN UP", "🆘 RECOVERY"])
         
         with tab_login:
             st.write("")
@@ -218,14 +284,41 @@ if not st.session_state.is_logged_in:
                 st.markdown("##### Create New Account")
                 s_u = st.text_input("Username", placeholder="Choose username")
                 s_e = st.text_input("Email", placeholder="name@example.com")
-                s_p = st.text_input("Password", type="password", placeholder="Min 8 chars, numbers & letters")
+                s_p = st.text_input("Password", type="password", placeholder="Create password")
+                
+                st.markdown("---")
+                st.markdown("##### 🔐 Security Question (For Recovery)")
+                s_q = st.selectbox("Select a Question", SECURITY_QUESTIONS)
+                s_a = st.text_input("Answer", placeholder="e.g. Fluffy")
+                
                 s_g = st.checkbox("I agree to data processing (GDPR).")
+                
                 if st.form_submit_button("✨ Create Account", type="secondary", use_container_width=True):
                     if s_u and s_p and s_e and s_g:
-                        suc, msg = register_new_user(s_u, s_e, s_p, s_g)
+                        suc, msg = register_new_user(s_u, s_e, s_p, s_g, s_q, s_a)
                         if suc: st.success(f"✅ {msg}"); time.sleep(2); st.rerun()
                         else: st.error(f"⚠️ {msg}")
                     else: st.warning("Please fill all fields.")
+
+        with tab_recover:
+            st.write("")
+            st.markdown("##### Forgot Password?")
+            r_u = st.text_input("Enter your Username", key="rec_user")
+            
+            if r_u:
+                has_q, question = get_security_question(r_u)
+                if has_q:
+                    st.info(f"❓ **Security Question:** {question}")
+                    with st.form("recovery_form"):
+                        r_ans = st.text_input("Your Answer")
+                        r_new_pass = st.text_input("New Password", type="password")
+                        if st.form_submit_button("Reset Password", type="primary"):
+                            suc, msg = reset_password_with_security_answer(r_u, r_ans, r_new_pass)
+                            if suc: st.success(msg)
+                            else: st.error(msg)
+                else:
+                    if r_u: st.warning("User not found or security question not set up.")
+
     st.stop()
 
 # ==========================================
@@ -314,18 +407,10 @@ with st.sidebar:
     
     if st.button("🏠 Home / Lobby", use_container_width=True, type="secondary"): st.session_state.is_sprint_active = False; st.session_state.view = 'Main'; st.rerun()
     if st.button("📊 Analytics", use_container_width=True, type="secondary"): st.session_state.is_sprint_active = False; st.session_state.view = 'Analytics'; st.rerun()
-    
-    # --- YENİ SETTINGS BUTONU ---
-    if st.button("⚙️ Settings", use_container_width=True, type="secondary"): 
-        st.session_state.is_sprint_active = False
-        st.session_state.view = 'Settings'
-        st.rerun()
+    if st.button("⚙️ Settings", use_container_width=True, type="secondary"): st.session_state.is_sprint_active = False; st.session_state.view = 'Settings'; st.rerun()
         
     if st.session_state.user_role == 'Admin':
-        if st.button("🔑 Admin Panel", use_container_width=True, type="primary"): 
-            st.session_state.is_sprint_active = False
-            st.session_state.view = 'Admin'
-            st.rerun()
+        if st.button("🔑 Admin Panel", use_container_width=True, type="primary"): st.session_state.is_sprint_active = False; st.session_state.view = 'Admin'; st.rerun()
     
     st.write("")
     if st.button("🚪 Logout", use_container_width=True, type="secondary"): 
@@ -349,14 +434,13 @@ if st.session_state.view == 'Main':
     with c4: 
         if st.button("↺ Review Errors", type="secondary"): start_review()
 
-# --- YENİ SETTINGS VIEW ---
+# --- SETTINGS VIEW (GÜNCELLENDİ) ---
 elif st.session_state.view == 'Settings':
     st.header("⚙️ Profile Settings")
-    st.markdown("Manage your account details below.")
     
-    c1, c2 = st.columns(2)
+    tab_acc, tab_sec = st.tabs(["👤 Account", "🔐 Security"])
     
-    with c1:
+    with tab_acc:
         st.markdown("### 📧 Update Email")
         with st.form("email_update_form"):
             new_email = st.text_input("New Email Address")
@@ -366,23 +450,40 @@ elif st.session_state.view == 'Settings':
                     if suc: st.success(msg)
                     else: st.error(msg)
                 else: st.warning("Please enter an email.")
-    
-    with c2:
+        
+        st.write("")
         st.markdown("### 🔒 Change Password")
         with st.form("pass_update_form"):
             curr_pass = st.text_input("Current Password", type="password")
             new_pass = st.text_input("New Password", type="password")
             confirm_pass = st.text_input("Confirm New Password", type="password")
-            
             if st.form_submit_button("Change Password", type="primary"):
                 if curr_pass and new_pass and confirm_pass:
-                    if new_pass != confirm_pass:
-                        st.error("New passwords do not match.")
+                    if new_pass != confirm_pass: st.error("New passwords do not match.")
                     else:
                         suc, msg = update_user_password(st.session_state.current_user, curr_pass, new_pass)
                         if suc: st.success(msg)
                         else: st.error(msg)
                 else: st.warning("All fields are required.")
+
+    with tab_sec:
+        st.markdown("### 🛡️ Recovery Question Setup")
+        st.info("Set a security question to recover your account if you forget your password.")
+        
+        # Mevcut kullanıcıya soru atanmış mı kontrol et (Opsiyonel ama iyi UX)
+        has_q, saved_q = get_security_question(st.session_state.current_user)
+        if has_q: st.success(f"Current Question: {saved_q}")
+        else: st.warning("You haven't set a security question yet.")
+        
+        with st.form("sec_q_form"):
+            new_q = st.selectbox("Select New Question", SECURITY_QUESTIONS)
+            new_a = st.text_input("New Answer", type="password")
+            if st.form_submit_button("Save Security Settings", type="primary"):
+                if new_q != SECURITY_QUESTIONS[0] and new_a:
+                    suc, msg = update_security_settings(st.session_state.current_user, new_q, new_a)
+                    if suc: st.success(msg)
+                    else: st.error(msg)
+                else: st.warning("Please select a question and enter an answer.")
 
 elif st.session_state.view == 'Study' and st.session_state.smart_list is not None:
     c_back, c_tm, c_ex = st.columns([1, 2, 1])
@@ -418,7 +519,6 @@ elif st.session_state.view == 'Study' and st.session_state.smart_list is not Non
         </div>
         """, unsafe_allow_html=True)
         
-        # AI HINT ALANI
         with st.expander("💡 🤖 Need a Hint? (AI & Search Tools)"):
             q_text = curr["content_text"]
             enc_q = urllib.parse.quote(q_text + " CISSP explanation")
