@@ -6,7 +6,8 @@ from datetime import datetime
 import time
 import hashlib
 import secrets
-import re # Düzenli ifadeler (Regex) için
+import re
+import urllib.parse  # Google araması için link oluştururken gerekli
 
 # --- 1. CISSP DOMAIN MAPPING ---
 TOPIC_MAP = {
@@ -20,29 +21,56 @@ TOPIC_MAP = {
     "8": "Software Development Security"
 }
 
-# --- 2. CONFIGURATION & SECURE HEADERS ---
+# --- 2. CONFIGURATION & HIGH CONTRAST CSS ---
 st.set_page_config(page_title="CISSP AI Mentor", page_icon="🛡️", layout="wide")
 
-# CSS (Değişmedi - Görünüm aynı)
 st.markdown("""
     <style>
     .stApp { background-color: #f4f6f9; }
+    
+    /* --- 1. SORU ŞIKLARI (VARSAYILAN BUTONLAR) --- */
     div.stButton > button {
-        width: 100%; border-radius: 12px !important; border: 2px solid #d1d8e0 !important;
-        padding: 15px 20px !important; font-size: 20px !important; font-weight: 600 !important;
-        background-color: #ffffff !important; color: #000000 !important;
-        min-height: 85px; white-space: normal !important; box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-        text-align: left !important; transition: all 0.2s ease; line-height: 1.5 !important;
+        width: 100%; 
+        border-radius: 12px !important; 
+        border: 2px solid #d1d8e0 !important; 
+        padding: 15px 20px !important; 
+        font-size: 20px !important; 
+        font-weight: 600 !important;
+        background-color: #ffffff !important; 
+        color: #000000 !important; 
+        min-height: 85px; 
+        white-space: normal !important; 
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        text-align: left !important; 
+        transition: all 0.2s ease;
+        line-height: 1.5 !important;
     }
-    div.stButton > button:hover { border-color: #3498db !important; background-color: #f0f8ff !important; color: #000000 !important; transform: translateY(-2px); }
+    
+    div.stButton > button:hover { 
+        border-color: #3498db !important; 
+        background-color: #f0f8ff !important; 
+        color: #000000 !important; 
+        transform: translateY(-2px);
+    }
+    
+    /* --- 2. AKSİYON BUTONLARI (Primary) --- */
     div.stButton > button[kind="primary"] {
         background: linear-gradient(135deg, #FF6B6B 0%, #EE5253 100%) !important;
-        color: white !important; border: none !important; text-align: center !important; font-weight: 700 !important;
+        color: white !important; 
+        border: none !important;
+        text-align: center !important; 
+        font-weight: 700 !important;
     }
+    
+    /* --- 3. NAVİGASYON BUTONLARI (Secondary) --- */
     div.stButton > button[kind="secondary"] {
-        background-color: #dfe6e9 !important; color: #2d3436 !important;
-        border: 1px solid #b2bec3 !important; text-align: center !important; font-size: 18px !important;
+        background-color: #dfe6e9 !important;
+        color: #2d3436 !important;
+        border: 1px solid #b2bec3 !important;
+        text-align: center !important;
+        font-size: 18px !important;
     }
+
     .q-card { background: white; padding: 35px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); border-top: 6px solid #2c3e50; margin-bottom: 25px; }
     .q-card h3 { font-size: 24px !important; line-height: 1.5 !important; color: #000000 !important; font-weight: 700 !important; }
     .profile-card { background: white; padding: 20px; border-radius: 15px; text-align: center; border: 1px solid #eee; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.03); }
@@ -53,11 +81,30 @@ st.markdown("""
     .metric-lbl { font-size: 12px; text-transform: uppercase; color: #95a5a6; letter-spacing: 1px; margin-top: 5px; }
     .timer-box { font-size: 22px; font-weight: 800; color: #e74c3c; text-align: center; background: white; border-radius: 10px; padding: 12px; margin-bottom: 20px; border: 2px solid #fab1a0; }
     .explanation-box { background-color: #e3fcf7; padding: 20px; border-radius: 12px; border-left: 5px solid #00b894; margin-top: 20px; color: #000000; font-size: 18px !important; line-height: 1.6; }
+    
+    /* AI Buton Stili (Linkler için) */
+    .ai-btn {
+        width: 100%;
+        background-color: #e3f2fd;
+        border: 1px solid #90caf9;
+        color: #1565c0;
+        padding: 12px;
+        border-radius: 8px;
+        text-align: center;
+        text-decoration: none;
+        display: inline-block;
+        font-weight: bold;
+        font-size: 16px;
+        transition: all 0.3s;
+    }
+    .ai-btn:hover {
+        background-color: #bbdefb;
+        transform: translateY(-2px);
+    }
     </style>
     """, unsafe_allow_html=True)
 
 # --- 3. CONNECTION & STATE ---
-# Güvenlik Notu: TTL=0 (Time To Live) kullanarak hassas verilerin önbellekte kalmasını önlüyoruz.
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 defaults = {
@@ -70,31 +117,21 @@ defaults = {
 for k, v in defaults.items():
     if k not in st.session_state: st.session_state[k] = v
 
-# --- 4. SECURITY FUNCTIONS (YENİ EKLENENLER) ---
+# --- 4. SECURITY & AUTH FUNCTIONS ---
 
 def sanitize_input(input_str):
-    """
-    Input Sanitization: Kullanıcı girdisinden potansiyel zararlı karakterleri temizler.
-    HTML taglerini ve özel karakterleri kaldırır.
-    """
     if not isinstance(input_str, str): return str(input_str)
-    # Sadece harf, rakam, nokta, alt çizgi, @ ve tire işaretine izin ver (Email ve Username için)
-    # Şifre için bu kullanılmaz, çünkü şifrede özel karakter olabilir.
     clean = re.sub(r'[^a-zA-Z0-9.@_-]', '', input_str)
     return clean
 
 def validate_password_strength(password):
-    """
-    Password Policy Enforcement: Şifre karmaşıklığını kontrol eder.
-    En az 8 karakter, 1 harf, 1 rakam.
-    """
     if len(password) < 8: return False, "Password too short (min 8 chars)."
     if not re.search(r"[a-zA-Z]", password): return False, "Password must contain a letter."
     if not re.search(r"\d", password): return False, "Password must contain a number."
     return True, "Valid"
 
 def hash_password(password, salt=None):
-    if salt is None: salt = secrets.token_hex(16) # Salt boyutu artırıldı (32 hex char)
+    if salt is None: salt = secrets.token_hex(16)
     hashed = hashlib.sha256((salt + password).encode('utf-8')).hexdigest()
     return f"{salt}|{hashed}"
 
@@ -104,10 +141,8 @@ def check_password(stored_password, input_password):
     if '|' in stored_password:
         salt, hashed = stored_password.split('|', 1)
         new_hash = hashlib.sha256((salt + input_password).encode('utf-8')).hexdigest()
-        # Timing Attack koruması için sabit zamanlı karşılaştırma (secrets.compare_digest)
         return secrets.compare_digest(new_hash, hashed)
     else:
-        # Legacy support (Eski şifreler için normal karşılaştırma mecburen kalıyor)
         if stored_password.endswith('.0'): stored_password = stored_password[:-2]
         return stored_password == input_password
 
@@ -119,11 +154,9 @@ def clean_boolean(val):
     return str(val).strip().upper() in ['TRUE', '1', '1.0', 'YES', 'ON']
 
 def register_new_user(username, email, password, gdpr):
-    # 1. Girdi Temizliği (Sanitization)
     clean_user = sanitize_input(username)
-    clean_email = sanitize_input(email) # Email validasyonu da eklenebilir ama şimdilik sanitize yeterli
+    clean_email = sanitize_input(email)
     
-    # 2. Şifre Politikası Kontrolü
     is_valid_pass, pass_msg = validate_password_strength(password)
     if not is_valid_pass: return False, pass_msg
 
@@ -146,7 +179,6 @@ def verify_login(username, password):
     users = get_all_users()
     if users.empty: return False, None
     
-    # Login işleminde sanitization yapmıyoruz (kullanıcı adında özel karakter olabilir mi? Bizim politikamıza göre hayır ama şifre hariç)
     input_user = str(username).strip()
     users['username_clean'] = users['username'].astype(str).str.strip()
     user_record = users[users['username_clean'] == input_user]
@@ -174,22 +206,17 @@ if not st.session_state.is_logged_in:
                 l_u = st.text_input("Username", placeholder="Enter username")
                 l_p = st.text_input("Password", type="password", placeholder="Enter password")
                 if st.form_submit_button("🚀 Login Dashboard", type="primary", use_container_width=True):
-                    # Rate Limiting (Basit koruma): Login denemesi öncesi minik bekleme
                     time.sleep(0.5) 
                     success, role = verify_login(l_u, l_p)
                     if success:
-                        st.session_state.is_logged_in = True
-                        st.session_state.current_user = l_u.strip()
-                        st.session_state.user_role = role
-                        st.session_state.view = 'Main' 
-                        st.rerun()
+                        st.session_state.is_logged_in = True; st.session_state.current_user = l_u.strip(); st.session_state.user_role = role; st.session_state.view = 'Main'; st.rerun()
                     else: st.error("❌ Incorrect username or password.")
 
         with tab_signup:
             st.write("")
             with st.form("signup_form"):
                 st.markdown("##### Create New Account")
-                s_u = st.text_input("Username", placeholder="Choose username (Alphanumeric)")
+                s_u = st.text_input("Username", placeholder="Choose username")
                 s_e = st.text_input("Email", placeholder="name@example.com")
                 s_p = st.text_input("Password", type="password", placeholder="Min 8 chars, numbers & letters")
                 s_g = st.checkbox("I agree to data processing (GDPR).")
@@ -217,13 +244,10 @@ def save_stat(q_id, correct, confidence, reason):
         }])
         updated_df = pd.concat([existing_df, new_row], ignore_index=True).dropna(how='all')
         conn.update(worksheet="User_Stats", data=updated_df)
-    except Exception as e: 
-        # Güvenlik: Hata detayını logla ama kullanıcıya gösterme
-        print(f"Stat Save Error: {e}") 
+    except Exception as e: print(f"Stat Save Error: {e}") 
 
 def get_user_rank(df):
     if df.empty: return "Novice", 0
-    # SQL Injection koruması: Pandas zaten parametrik çalışır ama yine de filtrelemede dikkatli olalım
     u_df = df[df['user_id'] == st.session_state.current_user]
     c = len(u_df)
     if c < 10: return "🟢 Novice", c
@@ -265,8 +289,7 @@ def start_review():
         c = min(len(r_list), 20)
         st.session_state.smart_list = r_list.sample(n=c).reset_index(drop=True)
         st.session_state.q_idx = 0; st.session_state.start_time = time.time(); st.session_state.is_sprint_active = True; st.session_state.view = 'Study'; st.session_state.mode = 'Review'; st.session_state.sprint_type = 'Count'; st.session_state.sprint_target = c; st.session_state.sprint_score = 0; st.session_state.sprint_total_attempted = 0; st.rerun()
-    except Exception as e: 
-        print(f"Review Error: {e}"); st.error("An error occurred while loading review.")
+    except Exception as e: print(f"Review Error: {e}"); st.error("Error loading review.")
 
 # --- SIDEBAR ---
 with st.sidebar:
@@ -300,9 +323,7 @@ with st.sidebar:
     
     st.write("")
     if st.button("🚪 Logout", use_container_width=True, type="secondary"): 
-        # Secure Logout: Session temizliği
-        for key in list(st.session_state.keys()):
-            del st.session_state[key]
+        for key in list(st.session_state.keys()): del st.session_state[key]
         st.rerun()
 
 # --- VIEWS ---
@@ -356,6 +377,27 @@ elif st.session_state.view == 'Study' and st.session_state.smart_list is not Non
         </div>
         """, unsafe_allow_html=True)
         
+        # --- YENİ EKLENEN AI YARDIM ALANI ---
+        with st.expander("💡 🤖 Need a Hint? (AI & Search Tools)"):
+            q_text = curr["content_text"]
+            # Soru metnini URL formatına çevir
+            enc_q = urllib.parse.quote(q_text + " CISSP explanation")
+            
+            c_h1, c_h2 = st.columns([1, 1])
+            with c_h1:
+                # HTML link butonu (st.link_button sürüm sorununu aşmak için)
+                st.markdown(f"""
+                <a href="https://www.google.com/search?q={enc_q}" target="_blank" style="text-decoration:none;">
+                    <div class="ai-btn">🌐 Search on Google</div>
+                </a>
+                """, unsafe_allow_html=True)
+            
+            with c_h2:
+                # Prompt Hazırlayıcı
+                prompt = f"Please explain this CISSP question and why the correct answer is the right choice:\n\n'{q_text}'\n\nOptions:\nA) {curr['option_a']}\nB) {curr['option_b']}\nC) {curr['option_c']}\nD) {curr['option_d']}"
+                st.text_area("📋 Copy Prompt for ChatGPT/Claude:", value=prompt, height=100)
+        # ------------------------------------
+
         c1, c2 = st.columns(2)
         opts = [('A', 'option_a'), ('B', 'option_b'), ('C', 'option_c'), ('D', 'option_d')]
         for i, (cd, cl) in enumerate(opts):
@@ -405,15 +447,12 @@ elif st.session_state.view == 'Analytics':
             merged = pd.merge(stats, questions[['qid', 'topic_id']], on='qid')
             merged['Domain'] = merged['topic_id'].astype(str).str.split('.').str[0].map(TOPIC_MAP)
             merged['is_correct_val'] = merged['is_correct'].apply(clean_boolean)
-            
             total_int = len(merged); acc = (merged['is_correct_val'].sum() / total_int * 100) if total_int > 0 else 0
             unique_q = merged['qid'].nunique(); cov = (unique_q / len(questions) * 100) if len(questions) > 0 else 0
-            
             k1, k2, k3 = st.columns(3)
             k1.markdown(f'<div class="metric-card"><div class="metric-num">{total_int}</div><div class="metric-lbl">Total Interactions</div></div>', unsafe_allow_html=True)
             k2.markdown(f'<div class="metric-card"><div class="metric-num">%{acc:.1f}</div><div class="metric-lbl">Accuracy</div></div>', unsafe_allow_html=True)
             k3.markdown(f'<div class="metric-card"><div class="metric-num">{unique_q}</div><div class="metric-lbl">Unique Qs ({cov:.1f}%)</div></div>', unsafe_allow_html=True)
-            
             st.write("---")
             c1, c2 = st.columns([1,2])
             merged['Result'] = merged['is_correct_val'].apply(lambda x: 'TRUE' if x == 1 else 'FALSE')
@@ -422,7 +461,7 @@ elif st.session_state.view == 'Analytics':
                 perf = merged.groupby('Domain')['Result'].value_counts(normalize=True).unstack().fillna(0)*100
                 if 'TRUE' in perf.columns: st.subheader("Domain Mastery (%)"); st.dataframe(perf[['TRUE']].rename(columns={'TRUE':'Success %'}).style.format("{:.1f}").bar(color='#198754'), use_container_width=True)
         else: st.info("No analytics data yet.")
-    except Exception as e: st.error("Error loading dashboard.")
+    except Exception as e: st.error(str(e))
 
 elif st.session_state.view == 'Admin':
     if st.session_state.user_role != 'Admin': st.session_state.view = 'Main'; st.rerun()
@@ -430,13 +469,10 @@ elif st.session_state.view == 'Admin':
     up = st.file_uploader("Upload Question Data (.xlsx)", type=['xlsx'])
     if up and st.button("Execute Sync"):
         try:
-            # Dosya Güvenliği: Sadece beklenen sütunlar var mı kontrol et
             EXPECTED_COLS = {'id', 'topic_id', 'content_text', 'option_a', 'option_b', 'option_c', 'option_d', 'correct_option', 'explanation'}
             n = pd.read_excel(up)
-            if not EXPECTED_COLS.issubset(n.columns):
-                st.error("Invalid File Format: Missing required columns.")
+            if not EXPECTED_COLS.issubset(n.columns): st.error("Invalid File Format: Missing required columns.")
             else:
                 c = conn.read(worksheet="Questions", ttl=0)
-                conn.update(worksheet="Questions", data=pd.concat([c, n], ignore_index=True))
-                st.success("Data injection successful.")
+                conn.update(worksheet="Questions", data=pd.concat([c, n], ignore_index=True)); st.success("Data injection successful.")
         except Exception as e: st.error("Injection Failed: Invalid file structure.")
