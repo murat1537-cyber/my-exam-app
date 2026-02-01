@@ -3,7 +3,6 @@ streamlit-gsheets
 pandas
 plotly
 openpyxl
-fpdf
 pyotp
 qrcode
 pillow
