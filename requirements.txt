@@ -1,6 +1,8 @@
-st-gsheets-connection
+streamlit
+streamlit-gsheets
 pandas
 plotly
-fpdf2
 openpyxl
-streamlit
+pyotp
+qrcode
+pillow
