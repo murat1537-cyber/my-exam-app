@@ -25,7 +25,7 @@ st.markdown("""
     /* GENEL ARKA PLAN */
     .stApp { background-color: #f4f6f9; }
     
-    /* BUTONLAR (Mevcut Stil Korundu) */
+    /* BUTONLAR */
     div.stButton > button {
         width: 100%; border-radius: 12px !important; border: 1px solid #e0e0e0;
         padding: 10px !important; font-size: 18px !important; font-weight: 600 !important;
@@ -46,25 +46,21 @@ st.markdown("""
         color: white !important; border: none;
     }
 
-    /* KART TASARIMLARI (İçerik) */
+    /* KART TASARIMLARI */
     .q-card { background: white; padding: 30px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); border-top: 6px solid #2c3e50; margin-bottom: 25px; }
     .q-card h3 { font-size: 22px !important; line-height: 1.5 !important; color: #2d3436 !important; font-weight: 700 !important; }
     .profile-card { background: white; padding: 20px; border-radius: 15px; text-align: center; border: 1px solid #eee; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.03); }
     
-    /* YENİ LOGIN EKRANI TASARIMI */
+    /* LOGIN EKRANI */
     .login-wrapper {
-        background: white;
-        padding: 40px;
-        border-radius: 20px;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.08);
-        border: 1px solid #f0f0f0;
-        text-align: center;
-        margin-top: 50px;
+        background: white; padding: 40px; border-radius: 20px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.08); border: 1px solid #f0f0f0;
+        text-align: center; margin-top: 50px;
     }
     .login-title { font-size: 28px; font-weight: 800; color: #2c3e50; margin-bottom: 10px; }
     .login-subtitle { font-size: 14px; color: #7f8c8d; margin-bottom: 30px; }
     
-    /* METRİK KARTLARI */
+    /* METRİKLER */
     .metric-card { background: white; padding: 20px; border-radius: 12px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.05); height: 100%; border-bottom: 4px solid #3498db; }
     .metric-num { font-size: 28px; font-weight: 800; color: #2c3e50; }
     .metric-lbl { font-size: 12px; text-transform: uppercase; color: #95a5a6; letter-spacing: 1px; margin-top: 5px; }
@@ -87,9 +83,10 @@ defaults = {
 for k, v in defaults.items():
     if k not in st.session_state: st.session_state[k] = v
 
-# --- 4. DATA HELPER FUNCTIONS ---
+# --- 4. AUTH HELPER FUNCTIONS (GÜÇLENDİRİLMİŞ) ---
 def get_all_users():
     try:
+        # Cache'i kapatıyoruz ki yeni kayıtlar anında görünsün
         return conn.read(worksheet="Users", ttl=0)
     except:
         return pd.DataFrame(columns=["username", "email", "password", "is_2fa_enabled", "gdpr_consent"])
@@ -101,30 +98,57 @@ def clean_boolean(val):
 
 def register_new_user(username, email, password, gdpr):
     users = get_all_users()
-    if not users.empty:
-        if username in users['username'].values: return False, "Username already exists!"
-        if 'email' in users.columns and email in users['email'].values: return False, "Email already registered!"
     
-    # Excel sütun sırasına uygun kayıt (2FA alanları şimdilik boş/pasif)
+    # Kullanıcı adı kontrolü (Boşlukları temizleyerek)
+    username = username.strip()
+    if not users.empty:
+        # Mevcut kullanıcı adlarını string yap ve temizle
+        existing_users = users['username'].astype(str).str.strip().values
+        if username in existing_users:
+            return False, "Username already exists!"
+    
+    # Yeni kayıt
     new_user = pd.DataFrame([{
-        "username": username, "email": email, "password": password,
-        "is_2fa_enabled": "FALSE", "gdpr_consent": "TRUE" if gdpr else "FALSE"
+        "username": username,
+        "email": email,
+        "password": str(password).strip(), # Şifreyi string olarak kaydet
+        "is_2fa_enabled": "FALSE",
+        "gdpr_consent": "TRUE" if gdpr else "FALSE"
     }])
     updated_users = pd.concat([users, new_user], ignore_index=True)
     conn.update(worksheet="Users", data=updated_users)
-    return True, "Account created successfully! You can now login."
+    return True, "Account created successfully! Go to Login tab."
 
 def verify_login(username, password):
     users = get_all_users()
-    if not users.empty:
-        user_record = users[users['username'] == username]
-        if not user_record.empty and str(user_record.iloc[0]['password']) == str(password):
+    if users.empty:
+        return False
+    
+    # 1. Girdileri Temizle
+    input_user = str(username).strip()
+    input_pass = str(password).strip()
+    
+    # 2. Veritabanındaki kullanıcı adlarını temizle
+    users['username_clean'] = users['username'].astype(str).str.strip()
+    
+    # 3. Kullanıcıyı ara
+    user_record = users[users['username_clean'] == input_user]
+    
+    if not user_record.empty:
+        # 4. Şifreyi al ve temizle (1234.0 sorununu çözer)
+        stored_pass = str(user_record.iloc[0]['password']).strip()
+        
+        # Eğer şifre '1234.0' gibiyse '.0' kısmını at
+        if stored_pass.endswith('.0'):
+            stored_pass = stored_pass[:-2]
+            
+        if stored_pass == input_pass:
             return True
+            
     return False
 
-# --- 5. LOGIN FLOW (YENİLENMİŞ UI) ---
+# --- 5. LOGIN FLOW (YENİ TASARIM) ---
 if not st.session_state.is_logged_in:
-    # Ekranı dikey ve yatay ortalamak için kolon yapısı
     c1, c2, c3 = st.columns([1, 1.5, 1])
     
     with c2:
@@ -136,37 +160,36 @@ if not st.session_state.is_logged_in:
         </div>
         """, unsafe_allow_html=True)
         
-        # Tabs ile geçiş
         tab_login, tab_signup = st.tabs(["🔑 LOGIN", "📝 SIGN UP"])
         
         # LOGIN TAB
         with tab_login:
             st.write("")
-            # st.form kullanımı Enter tuşu ile göndermeyi sağlar!
             with st.form("login_form"):
                 st.markdown("##### Welcome Back")
-                l_u = st.text_input("Username", placeholder="Enter your username")
-                l_p = st.text_input("Password", type="password", placeholder="Enter your password")
+                l_u = st.text_input("Username", placeholder="Enter username (e.g. Batu)")
+                l_p = st.text_input("Password", type="password", placeholder="Enter password")
                 
                 submitted = st.form_submit_button("🚀 Login Dashboard", type="primary", use_container_width=True)
                 
                 if submitted:
                     if verify_login(l_u, l_p):
                         st.session_state.is_logged_in = True
-                        st.session_state.current_user = l_u
+                        st.session_state.current_user = l_u.strip()
                         st.rerun()
                     else:
                         st.error("❌ Incorrect username or password.")
+                        st.info("Tip: If you haven't created an account yet, please use the 'Sign Up' tab.")
 
         # SIGNUP TAB
         with tab_signup:
             st.write("")
             with st.form("signup_form"):
                 st.markdown("##### Create New Account")
-                s_u = st.text_input("Username", placeholder="Choose a unique username")
-                s_e = st.text_input("Email Address", placeholder="name@example.com")
-                s_p = st.text_input("Password", type="password", placeholder="Create a strong password")
-                s_g = st.checkbox("I agree to allow data processing for learning analytics (GDPR).")
+                s_u = st.text_input("Username", placeholder="Choose a username")
+                s_e = st.text_input("Email", placeholder="name@example.com")
+                s_p = st.text_input("Password", type="password", placeholder="Create a password")
+                s_g = st.checkbox("I agree to data processing for analytics.")
                 
                 reg_submitted = st.form_submit_button("✨ Create Account", type="secondary", use_container_width=True)
                 
@@ -175,14 +198,12 @@ if not st.session_state.is_logged_in:
                         success, msg = register_new_user(s_u, s_e, s_p, s_g)
                         if success:
                             st.success(f"✅ {msg}")
-                            time.sleep(2) # Mesajı okuması için bekle
-                            st.rerun() # Login ekranına dönmek için
                         else:
                             st.error(f"⚠️ {msg}")
                     else:
-                        st.warning("Please fill all fields and accept the terms.")
+                        st.warning("Please fill all fields.")
 
-    st.stop() # Giriş yapılmadıysa kodun geri kalanını çalıştırma
+    st.stop()
 
 # ==========================================
 # ANA UYGULAMA (Giriş Başarılıysa Burası Çalışır)
@@ -213,7 +234,6 @@ def get_user_rank(df):
     else: return "👑 CISO Master", c
 
 def prepare_sprint_data(dom):
-    # Kota koruması için 10 dk (600sn) önbellek
     q = conn.read(worksheet="Questions", ttl=600)
     if dom != "All Domains (Mix)":
         tid = [k for k, v in TOPIC_MAP.items() if v == dom][0]
@@ -234,10 +254,12 @@ def start_sprint(m_type, val, dom):
 def start_review():
     try:
         stats = conn.read(worksheet="User_Stats", ttl=0)
+        if stats.empty: st.success("No errors found!"); return
+        
         stats = stats[stats['user_id'] == st.session_state.current_user]
-        # Analiz hatasını çözen temizlik fonksiyonu
         stats['is_correct_val'] = stats['is_correct'].apply(clean_boolean)
         wrong_ids = stats[stats['is_correct_val'] == 0]['question_id'].unique()
+        
         if len(wrong_ids) == 0: st.success("🎉 No errors recorded! Great job."); return
         
         all_q = conn.read(worksheet="Questions", ttl=600)
@@ -384,7 +406,7 @@ elif st.session_state.view == 'Analytics':
             merged = pd.merge(stats, questions[['qid', 'topic_id']], on='qid')
             merged['Domain'] = merged['topic_id'].astype(str).str.split('.').str[0].map(TOPIC_MAP)
             
-            # Veri temizliği
+            # Veri temizliği (clean_boolean)
             merged['is_correct_val'] = merged['is_correct'].apply(clean_boolean)
             
             total_int = len(merged); acc = (merged['is_correct_val'].sum() / total_int * 100) if total_int > 0 else 0
