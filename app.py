@@ -17,67 +17,99 @@ TOPIC_MAP = {
     "8": "Software Development Security"
 }
 
-# --- 2. CONFIGURATION & ULTRA-READABLE STYLING ---
+# --- 2. CONFIGURATION & MOBILE-FIRST CSS ---
 st.set_page_config(page_title="CISSP AI Mentor", page_icon="🛡️", layout="wide")
 
 st.markdown("""
     <style>
-    .stApp { background-color: #f4f6f9; }
+    /* GENEL AYARLAR */
+    .stApp { background-color: #f8f9fa; }
     
-    /* --- 1. BUTON VE FONT DEVLEŞTİRME --- */
+    /* --- BUTON TASARIMLARI (MOBİL UYUMLU) --- */
     
-    /* Tüm Standart Butonlar (Cevap Şıkları Dahil) */
+    /* Standart Butonlar (Cevap Şıkları vb.) */
     div.stButton > button {
-        font-size: 22px !important;    /* Cevap şıklarını büyüt */
-        height: 3.5em !important;      /* Yüksekliği artır */
-        font-weight: 600 !important;
+        width: 100%;
         border-radius: 12px !important;
-        border: 1px solid #bdc3c7;
+        border: 1px solid #e0e0e0;
+        padding: 15px 10px !important;
+        font-size: 18px !important; /* Okunaklı boyut */
+        font-weight: 500 !important;
+        background-color: white;
+        color: #2c3e50;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        height: auto !important; /* İçeriğe göre uzasın */
+        min-height: 60px; /* Mobilde parmakla basmak kolay olsun */
+        white-space: normal !important; /* Uzun yazılar alt satıra geçsin */
+        line-height: 1.4 !important;
     }
     
-    /* "Start Sprint" gibi Primary Butonlar */
+    div.stButton > button:hover {
+        border-color: #3498db;
+        color: #3498db;
+        background-color: #fdfdfd;
+    }
+
+    /* Primary Butonlar (Başlatıcılar - Kırmızı/Turuncu) */
     div.stButton > button[kind="primary"] {
-        background: linear-gradient(45deg, #FF512F 0%, #DD2476 100%);
-        color: white;
+        background: linear-gradient(135deg, #FF6B6B 0%, #EE5253 100%);
+        color: white !important;
         border: none;
-        height: 100px !important;      /* Daha da yüksek */
-        font-size: 26px !important;    /* Çok büyük yazı */
-        font-weight: 800 !important;
-        box-shadow: 0 8px 15px rgba(0,0,0,0.1);
+        font-size: 20px !important;
+        font-weight: 700 !important;
+        box-shadow: 0 4px 10px rgba(238, 82, 83, 0.3);
+        min-height: 70px;
     }
-
-    /* "Review Mistakes" gibi Secondary Butonlar */
+    
+    /* Secondary Butonlar (Review - Turuncu/Sarı) */
     div.stButton > button[kind="secondary"] {
-        border: 3px dashed #f39c12;
-        color: #d35400;
-        background-color: #fdf2e9;
-        font-size: 22px !important;
-        height: 80px !important;
+        background: linear-gradient(135deg, #f0932b 0%, #ffbe76 100%);
+        color: white !important;
+        border: none;
+        font-size: 20px !important;
+        font-weight: 700 !important;
+        min-height: 70px;
     }
 
-    /* --- 2. KART TASARIMLARI --- */
+    /* --- KART VE METİN TASARIMLARI --- */
+    
+    /* Soru Kartı */
     .q-card { 
         background: white; 
-        padding: 3rem; 
-        border-radius: 20px; 
-        box-shadow: 0 5px 15px rgba(0,0,0,0.05); 
-        border-left: 10px solid #2c3e50; 
-        margin-bottom: 30px; 
+        padding: 20px; 
+        border-radius: 16px; 
+        box-shadow: 0 4px 20px rgba(0,0,0,0.08); 
+        border-top: 6px solid #2c3e50; 
+        margin-bottom: 25px; 
     }
     .q-card h3 {
-        font-size: 32px !important;    /* Soru metni DEVASA */
+        font-size: 22px !important; /* Mobilde taşmayacak ideal boyut */
         line-height: 1.5 !important;
-        color: #2c3e50 !important;
+        color: #2d3436 !important;
+        font-weight: 700 !important;
     }
     
-    .profile-card { background: linear-gradient(135deg, #2c3e50 0%, #4ca1af 100%); padding: 25px; border-radius: 20px; color: white; text-align: center; margin-bottom: 25px; }
-    .result-card { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px; border-radius: 20px; color: white; text-align: center; margin: 20px 0; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
+    /* Profil Kartı (Sidebar) */
+    .profile-card { 
+        background: white; 
+        padding: 15px; 
+        border-radius: 12px; 
+        text-align: center; 
+        border: 1px solid #eee;
+        margin-bottom: 20px;
+    }
     
-    /* --- 3. DİĞER DETAYLAR --- */
-    .metric-container { background: white; padding: 20px; border-radius: 15px; text-align: center; border-bottom: 5px solid #3498db; }
-    .metric-value { font-size: 32px; font-weight: bold; color: #2c3e50; }
-    .explanation-box { background-color: #e8f6f3; padding: 25px; border-radius: 15px; border-left: 8px solid #1abc9c; margin-top: 20px; color: #16a085; font-size: 20px !important; }
-    .timer-box { font-size: 28px; font-weight: 800; color: #e74c3c; text-align: center; background: #fadbd8; border-radius: 12px; padding: 15px; margin-bottom: 25px; }
+    /* Sayaçlar */
+    .timer-box { font-size: 20px; font-weight: bold; color: #e74c3c; text-align: center; background: #fff5f5; border-radius: 8px; padding: 10px; margin-bottom: 15px; border: 1px solid #feb2b2; }
+    
+    /* Açıklama Kutusu */
+    .explanation-box { background-color: #e3fcf7; padding: 15px; border-radius: 10px; border-left: 5px solid #00b894; margin-top: 15px; color: #006266; font-size: 16px !important; }
+    
+    /* Dashboard Kartları */
+    .metric-card { background: white; padding: 15px; border-radius: 12px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.05); height: 100%; border-bottom: 3px solid #74b9ff; }
+    .metric-num { font-size: 24px; font-weight: 800; color: #2c3e50; }
+    .metric-lbl { font-size: 12px; text-transform: uppercase; color: #636e72; margin-top: 5px; }
+
     </style>
     """, unsafe_allow_html=True)
 
@@ -93,10 +125,9 @@ defaults = {
 for k, v in defaults.items():
     if k not in st.session_state: st.session_state[k] = v
 
-# --- 4. DATA FUNCTIONS (QUOTA FIX) ---
+# --- 4. DATA FUNCTIONS ---
 def save_stat(q_id, correct, confidence, reason):
     try:
-        # User_Stats anlık yazma gerektirir, önbellek (TTL) olmaz
         existing_df = conn.read(worksheet="User_Stats", ttl=0)
         new_row = pd.DataFrame([{
             "user_id": "User_01", "question_id": str(q_id),
@@ -106,8 +137,7 @@ def save_stat(q_id, correct, confidence, reason):
         }])
         updated_df = pd.concat([existing_df, new_row], ignore_index=True).dropna(how='all')
         conn.update(worksheet="User_Stats", data=updated_df)
-    except Exception as e:
-        st.warning(f"Bağlantı yoğunluğu nedeniyle istatistik kaydedilemedi. Devam edin. ({str(e)})")
+    except: pass 
 
 def get_user_rank(df):
     if df.empty: return "Novice", 0
@@ -118,141 +148,146 @@ def get_user_rank(df):
     else: return "👑 CISO Master", count
 
 def prepare_sprint_data(selected_domain):
-    # KRİTİK DÜZELTME: Questions sayfası 10 dakika (600sn) önbellekte tutulur.
-    # Bu, "Quota Exceeded" hatasını engeller.
     q_df = conn.read(worksheet="Questions", ttl=600)
-    
     if selected_domain != "All Domains (Mix)":
         target_id = [k for k, v in TOPIC_MAP.items() if v == selected_domain][0]
         q_df = q_df[q_df['topic_id'].astype(str).str.split('.').str[0] == target_id]
     return q_df
 
-# --- 5. SIDEBAR ---
+def start_sprint(mode_type, target_val, domain):
+    q_df = prepare_sprint_data(domain)
+    if q_df.empty:
+        st.error("No questions found for this domain.")
+        return
+
+    # Soru çekme mantığı
+    if mode_type == 'Time': 
+        # Zaman bazlıysa yeterince çok soru al
+        count = min(len(q_df), 40)
+    else:
+        # Soru bazlıysa tam sayı kadar al
+        count = min(len(q_df), target_val)
+
+    st.session_state.smart_list = q_df.sample(n=count).reset_index(drop=True)
+    st.session_state.q_idx = 0
+    st.session_state.start_time = time.time()
+    st.session_state.is_sprint_active = True
+    st.session_state.view = 'Study'
+    st.session_state.mode = 'Normal'
+    st.session_state.sprint_type = mode_type
+    st.session_state.sprint_target = target_val
+    st.session_state.sprint_score = 0
+    st.session_state.sprint_total_attempted = 0
+    st.rerun()
+
+def start_review_sprint():
+    try:
+        stats_df = conn.read(worksheet="User_Stats", ttl=0)
+        stats_df['is_correct_bool'] = stats_df['is_correct'].astype(str).str.upper().replace({'0':False,'1':True,'FALSE':False,'TRUE':True,'0.0':False})
+        wrong_ids = stats_df[stats_df['is_correct_bool'] == False]['question_id'].unique()
+        
+        if len(wrong_ids) == 0:
+            st.success("🎉 Clean sheet! No errors to review.")
+            return
+
+        all_q = conn.read(worksheet="Questions", ttl=600)
+        clean_wrong_ids = [str(x).split('.')[0] for x in wrong_ids]
+        all_q['clean_id'] = all_q['id'].astype(str).str.split('.').str[0]
+        review_list = all_q[all_q['clean_id'].isin(clean_wrong_ids)]
+        
+        if review_list.empty:
+            st.warning("Errors exist in logs but questions are missing from database.")
+            return
+
+        count = min(len(review_list), 20)
+        st.session_state.smart_list = review_list.sample(n=count).reset_index(drop=True)
+        st.session_state.q_idx = 0
+        st.session_state.start_time = time.time()
+        st.session_state.is_sprint_active = True
+        st.session_state.view = 'Study'
+        st.session_state.mode = 'Review'
+        st.session_state.sprint_type = 'Count'
+        st.session_state.sprint_target = count
+        st.session_state.sprint_score = 0
+        st.session_state.sprint_total_attempted = 0
+        st.rerun()
+    except Exception as e: st.error(f"Review Error: {e}")
+
+# --- 5. SIDEBAR (SADECE NAVİGASYON VE PROFİL) ---
 with st.sidebar:
     try:
-        # Profil verisini 1 dakika cache'le
         stats_preview = conn.read(worksheet="User_Stats", ttl=60)
         rank, total_q = get_user_rank(stats_preview)
     except: rank, total_q = "Novice", 0
     
     st.markdown(f"""
     <div class="profile-card">
-        <div style="font-size: 40px;">🛡️</div>
-        <div class="profile-name">Cyber Warrior</div>
-        <div class="profile-rank">{rank}</div>
-        <div style="margin-top:10px; font-size:14px;">Questions Solved: {total_q}</div>
+        <div style="font-size: 32px;">🛡️</div>
+        <div style="font-weight:bold; font-size:18px;">Cyber Warrior</div>
+        <div style="font-size:12px; opacity:0.8;">{rank}</div>
+        <div style="font-size:12px; margin-top:5px;">Solved: {total_q}</div>
     </div>
     """, unsafe_allow_html=True)
     
-    if st.session_state.is_sprint_active:
-        msg = "⏳ Time Sprint" if st.session_state.sprint_type == 'Time' else "📝 Question Sprint"
-        st.info(f"{msg} Active")
-        if st.button("▶️ Return to Study"): st.session_state.view = 'Study'; st.rerun()
-        if st.button("🛑 Terminate Session"): 
-            st.session_state.is_sprint_active = False; st.session_state.view = 'Analytics'; st.rerun()
-    else:
-        st.subheader("📚 Configuration")
-        domain_options = ["All Domains (Mix)"] + list(TOPIC_MAP.values())
-        selected_mode = st.selectbox("Domain:", domain_options)
-        
-        st.write("---")
-        st.markdown("### 🚀 Start New Sprint")
-        
-        c1, c2 = st.columns(2)
-        if c1.button("⏱️ 10 Min", type="primary", use_container_width=True):
-            q_df = prepare_sprint_data(selected_mode)
-            if not q_df.empty:
-                st.session_state.smart_list = q_df.sample(n=min(len(q_df), 30)).reset_index(drop=True)
-                st.session_state.q_idx = 0; st.session_state.start_time = time.time()
-                st.session_state.is_sprint_active = True; st.session_state.view = 'Study'
-                st.session_state.mode = 'Normal'
-                st.session_state.sprint_type = 'Time'; st.session_state.sprint_target = 600
-                st.session_state.sprint_score = 0; st.session_state.sprint_total_attempted = 0
-                st.rerun()
-            else: st.error("No questions found.")
-
-        if c2.button("⚡ 5 Min", type="primary", use_container_width=True):
-            q_df = prepare_sprint_data(selected_mode)
-            if not q_df.empty:
-                st.session_state.smart_list = q_df.sample(n=min(len(q_df), 15)).reset_index(drop=True)
-                st.session_state.q_idx = 0; st.session_state.start_time = time.time()
-                st.session_state.is_sprint_active = True; st.session_state.view = 'Study'
-                st.session_state.mode = 'Normal'
-                st.session_state.sprint_type = 'Time'; st.session_state.sprint_target = 300
-                st.session_state.sprint_score = 0; st.session_state.sprint_total_attempted = 0
-                st.rerun()
-            else: st.error("No questions found.")
-            
-        if st.button("📝 Ask me 10 Questions", use_container_width=True):
-            q_df = prepare_sprint_data(selected_mode)
-            if not q_df.empty:
-                count = min(len(q_df), 10)
-                st.session_state.smart_list = q_df.sample(n=count).reset_index(drop=True)
-                st.session_state.q_idx = 0; st.session_state.start_time = time.time()
-                st.session_state.is_sprint_active = True; st.session_state.view = 'Study'
-                st.session_state.mode = 'Normal'
-                st.session_state.sprint_type = 'Count'; st.session_state.sprint_target = count
-                st.session_state.sprint_score = 0; st.session_state.sprint_total_attempted = 0
-                st.rerun()
-            else: st.error("No questions found.")
-
-        st.write("")
-        if st.button("↺ Review Mistakes", type="secondary", use_container_width=True):
-            try:
-                stats_df = conn.read(worksheet="User_Stats", ttl=0)
-                stats_df['is_correct_bool'] = stats_df['is_correct'].astype(str).str.upper().replace({'0':False,'1':True,'FALSE':False,'TRUE':True,'0.0':False})
-                wrong_ids = stats_df[stats_df['is_correct_bool'] == False]['question_id'].unique()
-                
-                if len(wrong_ids) == 0: st.success("No errors found!")
-                else:
-                    all_q = conn.read(worksheet="Questions", ttl=600)
-                    clean_wrong_ids = [str(x).split('.')[0] for x in wrong_ids]
-                    all_q['clean_id'] = all_q['id'].astype(str).str.split('.').str[0]
-                    review_list = all_q[all_q['clean_id'].isin(clean_wrong_ids)]
-                    
-                    if not review_list.empty:
-                        count = min(len(review_list), 20)
-                        st.session_state.smart_list = review_list.sample(n=count).reset_index(drop=True)
-                        st.session_state.q_idx = 0; st.session_state.start_time = time.time()
-                        st.session_state.is_sprint_active = True; st.session_state.view = 'Study'
-                        st.session_state.mode = 'Review'
-                        st.session_state.sprint_type = 'Count'; st.session_state.sprint_target = count
-                        st.session_state.sprint_score = 0; st.session_state.sprint_total_attempted = 0
-                        st.rerun()
-            except: st.error("Review Error")
-
     st.write("---")
-    if st.button("📊 Analytics"): st.session_state.view = 'Analytics'
-    if st.button("🔑 Admin"): st.session_state.view = 'Admin'
-
-# --- 6. VIEWS CONTROL ---
-
-# A. SCORE SUMMARY VIEW
-if st.session_state.view == 'Score_Summary':
-    score = st.session_state.sprint_score
-    total = st.session_state.sprint_total_attempted
-    accuracy = (score / total * 100) if total > 0 else 0
     
-    st.markdown(f"""
-    <div class="result-card">
-        <h1>🏁 Sprint Complete!</h1>
-        <div style="font-size: 80px; font-weight: bold; margin: 20px 0;">{score} / {total}</div>
-        <h3>Accuracy: {accuracy:.1f}%</h3>
-        <p>Excellent work! Review your analytics for details.</p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    col1, col2 = st.columns(2)
-    if col1.button("📊 Go to Dashboard", use_container_width=True):
+    if st.button("🏠 Home / Lobby"): 
+        st.session_state.is_sprint_active = False
+        st.session_state.view = 'Main'; st.rerun()
+        
+    if st.button("📊 Analytics"): 
+        st.session_state.is_sprint_active = False
         st.session_state.view = 'Analytics'; st.rerun()
-    if col2.button("🔁 Start New Sprint", use_container_width=True):
-        st.session_state.view = 'Main'; st.session_state.is_sprint_active = False; st.rerun()
+        
+    if st.button("🔑 Admin Panel"): 
+        st.session_state.is_sprint_active = False
+        st.session_state.view = 'Admin'; st.rerun()
 
-# B. STUDY VIEW
-elif st.session_state.view == 'Study' and st.session_state.smart_list is not None:
-    ph = st.empty()
-    should_end = False
+# --- 6. VIEWS ---
+
+# A. MAIN VIEW (LOBBY - MOBİL İÇİN ANA EKRAN)
+if st.session_state.view == 'Main':
+    st.title("🛡️ CISSP Mentor Pro")
+    st.markdown("Ready to train? Select a mode to begin.")
     
+    # Domain Seçimi Ana Ekranda
+    domain_options = ["All Domains (Mix)"] + list(TOPIC_MAP.values())
+    selected_mode = st.selectbox("🎯 Target Domain:", domain_options)
+    
+    st.write("")
+    
+    # Başlatma Butonları (Grid)
+    c1, c2 = st.columns(2)
+    with c1:
+        if st.button("⏱️ 10 Min Sprint", type="primary", use_container_width=True):
+            start_sprint('Time', 600, selected_mode)
+    with c2:
+        if st.button("⚡ 5 Min Blitz", type="primary", use_container_width=True):
+            start_sprint('Time', 300, selected_mode)
+            
+    c3, c4 = st.columns(2)
+    with c3:
+        if st.button("📝 10 Questions", type="primary", use_container_width=True):
+            start_sprint('Count', 10, selected_mode)
+    with c4:
+        # Review butonu farklı renkte (secondary)
+        if st.button("↺ Review Errors", type="secondary", use_container_width=True):
+            start_review_sprint()
+
+# B. STUDY VIEW (AKTİF SINAV)
+elif st.session_state.view == 'Study' and st.session_state.smart_list is not None:
+    # --- Üst Bar ---
+    c_timer, c_exit = st.columns([3, 1])
+    with c_timer:
+        ph = st.empty()
+    with c_exit:
+        if st.button("Exit", key="exit_btn"):
+            st.session_state.is_sprint_active = False
+            st.session_state.view = 'Main'
+            st.rerun()
+
+    # Sayaç Mantığı
+    should_end = False
     if st.session_state.sprint_type == 'Time':
         rem = max(0, int(st.session_state.sprint_target - (time.time() - st.session_state.start_time)))
         if rem <= 0: should_end = True
@@ -261,27 +296,32 @@ elif st.session_state.view == 'Study' and st.session_state.smart_list is not Non
         current = st.session_state.q_idx + 1
         total = st.session_state.sprint_target
         if current > total: should_end = True
-        else:
-            ph.markdown(f'<div class="progress-box">📝 Question {current} / {total}</div>', unsafe_allow_html=True)
+        ph.markdown(f'<div class="timer-box">Question {current} / {total}</div>', unsafe_allow_html=True)
 
     if should_end:
-        st.session_state.is_sprint_active = False; st.session_state.view = 'Score_Summary'; st.rerun()
+        st.session_state.is_sprint_active = False
+        st.session_state.view = 'Score_Summary'
+        st.rerun()
 
+    # --- Soru Kartı ---
     if st.session_state.q_idx < len(st.session_state.smart_list):
         curr = st.session_state.smart_list.iloc[st.session_state.q_idx]
         topic_name = TOPIC_MAP.get(str(curr['topic_id']).split('.')[0], 'General')
-        mode_badge = "🔴 REVIEW" if st.session_state.mode == 'Review' else f"📍 {topic_name.upper()}"
+        mode_badge = "🔴 REVIEW MODE" if st.session_state.mode == 'Review' else f"📍 {topic_name.upper()}"
         
         st.markdown(f"""
         <div class="q-card">
-            <div style="color:#7f8c8d; font-size:18px; margin-bottom:15px; font-weight:bold;">{mode_badge}</div>
+            <div style="color:#7f8c8d; font-size:12px; margin-bottom:10px; font-weight:bold;">{mode_badge}</div>
             <h3>{curr["content_text"]}</h3>
         </div>
         """, unsafe_allow_html=True)
         
+        # Cevap Şıkları (Tek sütun mobilde daha iyidir, geniş ekranda 2 sütun)
         c1, c2 = st.columns(2)
         opts = [('A', 'option_a'), ('B', 'option_b'), ('C', 'option_c'), ('D', 'option_d')]
+        
         for i, (code, col) in enumerate(opts):
+            # Mobilde tek sütun gibi davranması için genişlik ayarı CSS'te yapıldı
             with (c1 if i%2==0 else c2):
                 if st.button(f"{code}) {curr[col]}", use_container_width=True):
                     st.session_state.feedback = (code == curr['correct_option'])
@@ -290,70 +330,83 @@ elif st.session_state.view == 'Study' and st.session_state.smart_list is not Non
                     st.session_state.sprint_total_attempted += 1
                     st.rerun()
 
+        # Feedback
         if st.session_state.feedback is not None:
             st.write("---")
             if st.session_state.feedback:
                 st.success(f"✅ Correct! Answer: {curr['correct_option']}")
-                if 'explanation' in curr: st.markdown(f'<div class="explanation-box"><b>AI Insight:</b> {curr["explanation"]}</div>', unsafe_allow_html=True)
+                if 'explanation' in curr: st.markdown(f'<div class="explanation-box"><b>Insight:</b> {curr["explanation"]}</div>', unsafe_allow_html=True)
                 
                 sc1, sc2 = st.columns(2)
-                if sc1.button("🎯 Sure"):
+                if sc1.button("🎯 Sure", use_container_width=True):
                     save_stat(st.session_state.last_q_id, True, "Sure", "None")
                     st.session_state.q_idx += 1; st.session_state.feedback = None; st.rerun()
-                if sc2.button("🎲 Guess"):
+                if sc2.button("🎲 Guess", use_container_width=True):
                     save_stat(st.session_state.last_q_id, True, "Guessed", "None")
                     st.session_state.q_idx += 1; st.session_state.feedback = None; st.rerun()
             else:
                 st.error(f"❌ Wrong. Correct: {curr['correct_option']}")
-                if 'explanation' in curr: st.markdown(f'<div class="explanation-box"><b>AI Insight:</b> {curr["explanation"]}</div>', unsafe_allow_html=True)
+                if 'explanation' in curr: st.markdown(f'<div class="explanation-box"><b>Insight:</b> {curr["explanation"]}</div>', unsafe_allow_html=True)
                 
                 ec1, ec2, ec3 = st.columns(3)
-                if ec1.button("🧠 Knowledge"):
+                if ec1.button("🧠 Knowledge", use_container_width=True):
                     save_stat(st.session_state.last_q_id, False, "None", "Knowledge Gap")
                     st.session_state.q_idx += 1; st.session_state.feedback = None; st.rerun()
-                if ec2.button("👀 Attention"):
+                if ec2.button("👀 Attention", use_container_width=True):
                     save_stat(st.session_state.last_q_id, False, "None", "Attention")
                     st.session_state.q_idx += 1; st.session_state.feedback = None; st.rerun()
-                if ec3.button("🤔 Logic"):
+                if ec3.button("🤔 Logic", use_container_width=True):
                     save_stat(st.session_state.last_q_id, False, "None", "Interpretation")
                     st.session_state.q_idx += 1; st.session_state.feedback = None; st.rerun()
     else:
         st.session_state.is_sprint_active = False; st.session_state.view = 'Score_Summary'; st.rerun()
 
-# C. ANALYTICS VIEW
+# C. SCORE SUMMARY
+elif st.session_state.view == 'Score_Summary':
+    score = st.session_state.sprint_score
+    total = st.session_state.sprint_total_attempted
+    acc = (score / total * 100) if total > 0 else 0
+    
+    st.markdown(f"""
+    <div style="text-align:center; padding: 40px; background:white; border-radius:20px; box-shadow:0 4px 15px rgba(0,0,0,0.1);">
+        <h1 style="color:#2c3e50;">🏁 Sprint Finished!</h1>
+        <div style="font-size: 60px; font-weight: 800; color:#3498db; margin: 20px 0;">{score} / {total}</div>
+        <h3 style="color:#7f8c8d;">Accuracy: {acc:.1f}%</h3>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.write("")
+    c1, c2 = st.columns(2)
+    if c1.button("🏠 Return to Home", use_container_width=True):
+        st.session_state.view = 'Main'; st.rerun()
+    if c2.button("📊 View Analytics", use_container_width=True):
+        st.session_state.view = 'Analytics'; st.rerun()
+
+# D. ANALYTICS
 elif st.session_state.view == 'Analytics':
     st.header("📊 Intelligence Dashboard")
     try:
-        # KRİTİK DÜZELTME: User_Stats'ı try-except içine aldık
-        # Questions sayfası 10 dk cache'den gelir (ttl=600), API'yi yormaz.
-        try:
-            stats = conn.read(worksheet="User_Stats", ttl=0)
-        except:
-            st.warning("⚠️ High traffic. Showing cached stats (might be slightly delayed).")
-            stats = conn.read(worksheet="User_Stats", ttl=60) # Failover to cache
-
-        questions = conn.read(worksheet="Questions", ttl=600) 
+        try: stats = conn.read(worksheet="User_Stats", ttl=0)
+        except: stats = conn.read(worksheet="User_Stats", ttl=60)
+        
+        questions = conn.read(worksheet="Questions", ttl=600)
         
         if not stats.empty and not questions.empty:
             stats['qid'] = stats['question_id'].astype(str).str.split('.').str[0]
             questions['qid'] = questions['id'].astype(str).str.split('.').str[0]
             merged = pd.merge(stats, questions[['qid', 'topic_id']], on='qid')
             merged['Domain'] = merged['topic_id'].astype(str).str.split('.').str[0].map(TOPIC_MAP)
-            merged['is_correct_bool'] = merged['is_correct'].astype(str).str.upper().replace({'0':False,'1':True, '0.0':False, '1.0':True, 'FALSE':False, 'TRUE':True})
+            merged['is_correct_bool'] = merged['is_correct'].astype(str).str.upper().replace({'0':False,'1':True,'FALSE':False,'TRUE':True})
             
             total_int = len(merged)
             acc = (merged['is_correct_bool'].sum() / total_int * 100) if total_int > 0 else 0
             unique_q = merged['qid'].nunique()
-            total_pool = len(questions)
-            cov = (unique_q / total_pool * 100) if total_pool > 0 else 0
-            dom_acc = merged.groupby('Domain')['is_correct_bool'].mean()
-            best_dom = dom_acc.idxmax() if not dom_acc.empty else "N/A"
+            cov = (unique_q / len(questions) * 100) if len(questions) > 0 else 0
 
-            k1, k2, k3, k4 = st.columns(4)
-            k1.markdown(f'<div class="metric-container"><div class="metric-value">{total_int}</div><div class="metric-label">Interactions</div></div>', unsafe_allow_html=True)
-            k2.markdown(f'<div class="metric-container"><div class="metric-value">%{acc:.1f}</div><div class="metric-label">Accuracy</div></div>', unsafe_allow_html=True)
-            k3.markdown(f'<div class="metric-container"><div class="metric-value">{unique_q}/{total_pool}</div><div class="metric-label">Coverage ({cov:.1f}%)</div></div>', unsafe_allow_html=True)
-            k4.markdown(f'<div class="metric-container"><div class="metric-value" style="font-size:16px;">{best_dom}</div><div class="metric-label">Strongest Domain</div></div>', unsafe_allow_html=True)
+            k1, k2, k3 = st.columns(3)
+            k1.markdown(f'<div class="metric-card"><div class="metric-num">{total_int}</div><div class="metric-lbl">Interactions</div></div>', unsafe_allow_html=True)
+            k2.markdown(f'<div class="metric-card"><div class="metric-num">%{acc:.1f}</div><div class="metric-lbl">Accuracy</div></div>', unsafe_allow_html=True)
+            k3.markdown(f'<div class="metric-card"><div class="metric-num">{unique_q}</div><div class="metric-lbl">Unique Qs ({cov:.1f}%)</div></div>', unsafe_allow_html=True)
             
             st.write("---")
             
@@ -361,18 +414,15 @@ elif st.session_state.view == 'Analytics':
             merged['res'] = merged['is_correct_bool'].apply(lambda x: 'TRUE' if x else 'FALSE')
             with c1:
                 st.plotly_chart(px.pie(merged, names='res', title="Success Ratio", color_discrete_map={'TRUE':'#2ecc71','FALSE':'#e74c3c'}), use_container_width=True)
-                errs = merged[merged['res']=='FALSE']
-                if not errs.empty: st.plotly_chart(px.pie(errs, names='error_reason', title="Error Causes", hole=0.4), use_container_width=True)
             with c2:
                 perf = merged.groupby('Domain')['res'].value_counts(normalize=True).unstack().fillna(0)*100
                 if 'TRUE' in perf.columns:
                     st.subheader("Domain Mastery (%)")
                     st.dataframe(perf[['TRUE']].rename(columns={'TRUE':'%'}).style.format("{:.1f}").bar(color='#2ecc71'), use_container_width=True)
-                st.plotly_chart(px.bar(merged, x='Domain', color='res', title="Volume Analysis"), use_container_width=True)
         else: st.info("No data.")
     except Exception as e: st.error(str(e))
 
-# D. ADMIN VIEW
+# E. ADMIN
 elif st.session_state.view == 'Admin':
     if not st.session_state.admin_auth:
         if st.text_input("Admin Code", type="password") == "1234": st.session_state.admin_auth = True; st.rerun()
