@@ -17,14 +17,55 @@ TOPIC_MAP = {
     "8": "Software Development Security"
 }
 
-# --- 2. CONFIGURATION & STYLING ---
-st.set_page_config(page_title="CISSP AI Mentor", layout="wide")
+# --- 2. CONFIGURATION & PRO UI STYLING ---
+st.set_page_config(page_title="CISSP AI Mentor", page_icon="🛡️", layout="wide")
+
 st.markdown("""
     <style>
-    .q-card { background: white; padding: 2rem; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border-top: 5px solid #007bff; margin-bottom: 20px;}
-    .explanation-box { background-color: #fff9db; padding: 15px; border-radius: 10px; border-left: 5px solid #fcc419; margin-top: 10px; color: #856404; }
-    .timer-box { font-size: 24px; font-weight: bold; color: #d32f2f; text-align: center; background: #ffebee; border-radius: 8px; padding: 10px; margin-bottom: 20px; }
-    .stButton>button { border-radius: 10px; height: 3.5em; font-weight: 600; width: 100%; }
+    /* Genel Arka Plan */
+    .stApp { background-color: #f4f6f9; }
+    
+    /* Kart Tasarımları */
+    .q-card { 
+        background: white; 
+        padding: 2.5rem; 
+        border-radius: 15px; 
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05); 
+        border-left: 6px solid #2c3e50;
+        margin-bottom: 25px;
+    }
+    
+    /* Sidebar Profil Kartı */
+    .profile-card {
+        background: linear-gradient(135deg, #2c3e50 0%, #4ca1af 100%);
+        padding: 20px;
+        border-radius: 15px;
+        color: white;
+        text-align: center;
+        margin-bottom: 20px;
+    }
+    .profile-rank { font-size: 14px; opacity: 0.9; letter-spacing: 1px; text-transform: uppercase; }
+    .profile-name { font-size: 24px; font-weight: bold; margin: 10px 0; }
+    
+    /* KPI Kartları (Analiz Sayfası) */
+    .metric-container {
+        background: white;
+        padding: 20px;
+        border-radius: 12px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        text-align: center;
+        border-bottom: 4px solid #3498db;
+    }
+    .metric-value { font-size: 28px; font-weight: bold; color: #2c3e50; }
+    .metric-label { font-size: 14px; color: #7f8c8d; text-transform: uppercase; }
+    
+    /* Timer & Uyarılar */
+    .timer-box { font-size: 22px; font-weight: 800; color: #e74c3c; text-align: center; background: #fadbd8; border-radius: 8px; padding: 12px; margin-bottom: 20px; }
+    .explanation-box { background-color: #e8f6f3; padding: 20px; border-radius: 10px; border-left: 5px solid #1abc9c; margin-top: 15px; color: #16a085; }
+    
+    /* Butonlar */
+    .stButton>button { border-radius: 8px; height: 3.2em; font-weight: 600; width: 100%; border: none; transition: all 0.3s; }
+    .stButton>button:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
     </style>
     """, unsafe_allow_html=True)
 
@@ -39,7 +80,7 @@ if 'start_time' not in st.session_state: st.session_state.start_time = None
 if 'admin_auth' not in st.session_state: st.session_state.admin_auth = False
 if 'is_sprint_active' not in st.session_state: st.session_state.is_sprint_active = False
 
-# --- 4. DATA FUNCTION ---
+# --- 4. DATA FUNCTIONS ---
 def save_stat(q_id, correct, confidence, reason):
     try:
         existing_df = conn.read(worksheet="User_Stats", ttl=0)
@@ -53,33 +94,51 @@ def save_stat(q_id, correct, confidence, reason):
         conn.update(worksheet="User_Stats", data=updated_df)
     except: pass 
 
-# --- 5. SIDEBAR (YENİLENEN KISIM) ---
+def get_user_rank(df):
+    """Kullanıcının çözdüğü soru sayısına göre rütbe belirler"""
+    if df.empty: return "Novice", 0
+    count = len(df)
+    if count < 10: return "🟢 Novice", count
+    elif count < 50: return "🔵 Junior Analyst", count
+    elif count < 100: return "🟣 Security Architect", count
+    else: return "👑 CISO Master", count
+
+# --- 5. SIDEBAR (PROFİL KARTI EKLENDİ) ---
 with st.sidebar:
-    st.title("🛡️ CISSP Mentor")
+    # --- Profil Kartı ---
+    try:
+        stats_preview = conn.read(worksheet="User_Stats", ttl=60) # Önbellekli okuma
+        rank, total_q = get_user_rank(stats_preview)
+    except: rank, total_q = "Novice", 0
     
+    st.markdown(f"""
+    <div class="profile-card">
+        <div style="font-size: 40px;">🛡️</div>
+        <div class="profile-name">Cyber Warrior</div>
+        <div class="profile-rank">{rank}</div>
+        <div style="margin-top:10px; font-size:12px;">Questions Solved: {total_q}</div>
+    </div>
+    """, unsafe_allow_html=True)
+    # --------------------
+
     if st.session_state.is_sprint_active:
-        st.info("🟢 Exam in Progress")
+        st.info("⚡ Sprint in Progress")
         if st.button("▶️ Return to Sprint"): st.session_state.view = 'Study'; st.rerun()
         if st.button("🛑 Terminate Sprint"): 
             st.session_state.is_sprint_active = False; st.session_state.view = 'Analytics'; st.rerun()
     else:
-        st.subheader("📚 Study Configuration")
-        # Domain Seçim Kutusu
+        st.subheader("⚙️ Mission Control")
         domain_options = ["All Domains (Mix)"] + list(TOPIC_MAP.values())
-        selected_mode = st.selectbox("Select Domain:", domain_options)
+        selected_mode = st.selectbox("Target Domain:", domain_options)
         
         if st.button("🚀 Start 10-Min Sprint"):
             q_df = conn.read(worksheet="Questions", ttl=0)
-            
-            # Domain Filtreleme Mantığı
             if selected_mode != "All Domains (Mix)":
-                # Seçilen ismin ID'sini bul (Tersine arama)
                 target_id = [k for k, v in TOPIC_MAP.items() if v == selected_mode][0]
-                # Veriyi filtrele (String/Float hatasını önleyerek)
                 q_df = q_df[q_df['topic_id'].astype(str).str.split('.').str[0] == target_id]
             
             if q_df.empty:
-                st.error(f"No questions found for '{selected_mode}'. Please upload questions first.")
+                st.error("No intelligence data found for this domain.")
             else:
                 sample_n = min(len(q_df), 25)
                 st.session_state.smart_list = q_df.sample(n=sample_n).reset_index(drop=True)
@@ -87,12 +146,11 @@ with st.sidebar:
                 st.session_state.is_sprint_active = True; st.session_state.view = 'Study'; st.rerun()
     
     st.write("---")
-    if st.button("📊 Analytics"): st.session_state.view = 'Analytics'
-    if st.button("🔑 Admin"): st.session_state.view = 'Admin'
+    if st.button("📊 Analytics Dashboard"): st.session_state.view = 'Analytics'
+    if st.button("🔑 Admin Access"): st.session_state.view = 'Admin'
 
 # --- 6. STUDY VIEW ---
 if st.session_state.view == 'Study' and st.session_state.smart_list is not None:
-    # Live Timer
     ph = st.empty()
     rem = max(0, int(600 - (time.time() - st.session_state.start_time)))
     if rem <= 0: st.session_state.is_sprint_active = False; st.session_state.view = 'Analytics'; st.rerun()
@@ -101,10 +159,14 @@ if st.session_state.view == 'Study' and st.session_state.smart_list is not None:
     curr = st.session_state.smart_list.iloc[st.session_state.q_idx]
     topic_name = TOPIC_MAP.get(str(curr['topic_id']).split('.')[0], 'General Domain')
     
-    st.caption(f"Topic: {topic_name}")
-    st.markdown(f'<div class="q-card"><h3>{curr["content_text"]}</h3></div>', unsafe_allow_html=True)
+    # Yeni Kart Tasarımı
+    st.markdown(f"""
+    <div class="q-card">
+        <div style="color:#7f8c8d; font-size:14px; margin-bottom:10px;">📍 DOMAIN: {topic_name.upper()}</div>
+        <h3 style="color:#2c3e50; margin:0;">{curr["content_text"]}</h3>
+    </div>
+    """, unsafe_allow_html=True)
     
-    # Options Buttons
     c1, c2 = st.columns(2)
     opts = [('A', 'option_a'), ('B', 'option_b'), ('C', 'option_c'), ('D', 'option_d')]
     for i, (code, col) in enumerate(opts):
@@ -114,86 +176,98 @@ if st.session_state.view == 'Study' and st.session_state.smart_list is not None:
                 st.session_state.last_q_id = curr['id']
                 st.rerun()
 
-    # Feedback Logic
     if st.session_state.feedback is not None:
         st.write("---")
         if st.session_state.feedback:
             st.success(f"✅ Correct! The answer is {curr['correct_option']}")
-            if 'explanation' in curr: st.info(f"ℹ️ {curr['explanation']}")
+            if 'explanation' in curr: st.markdown(f'<div class="explanation-box"><b>AI Insight:</b> {curr["explanation"]}</div>', unsafe_allow_html=True)
             
             sc1, sc2 = st.columns(2)
-            if sc1.button("🎯 Sure"):
+            if sc1.button("🎯 I knew it (Sure)"):
                 save_stat(st.session_state.last_q_id, True, "Sure", "None")
                 st.session_state.q_idx += 1; st.session_state.feedback = None; st.rerun()
-            if sc2.button("🎲 Guessed"):
+            if sc2.button("🎲 Lucky Guess"):
                 save_stat(st.session_state.last_q_id, True, "Guessed", "None")
                 st.session_state.q_idx += 1; st.session_state.feedback = None; st.rerun()
         else:
-            st.error(f"❌ Incorrect! The correct answer is {curr['correct_option']}")
-            if 'explanation' in curr: st.info(f"ℹ️ {curr['explanation']}")
+            st.error(f"❌ Incorrect. The correct answer is {curr['correct_option']}")
+            if 'explanation' in curr: st.markdown(f'<div class="explanation-box"><b>AI Insight:</b> {curr["explanation"]}</div>', unsafe_allow_html=True)
             
             ec1, ec2, ec3 = st.columns(3)
             if ec1.button("🧠 Knowledge Gap"):
                 save_stat(st.session_state.last_q_id, False, "None", "Knowledge Gap")
                 st.session_state.q_idx += 1; st.session_state.feedback = None; st.rerun()
-            if ec2.button("👀 Attention"):
+            if ec2.button("👀 Careless Error"):
                 save_stat(st.session_state.last_q_id, False, "None", "Attention")
                 st.session_state.q_idx += 1; st.session_state.feedback = None; st.rerun()
-            if ec3.button("🤔 Logic"):
+            if ec3.button("🤔 Logic Trap"):
                 save_stat(st.session_state.last_q_id, False, "None", "Interpretation")
                 st.session_state.q_idx += 1; st.session_state.feedback = None; st.rerun()
 
-# --- 7. ANALYTICS VIEW ---
+# --- 7. ANALYTICS VIEW (KPI KARTLARI EKLENDİ) ---
 elif st.session_state.view == 'Analytics':
-    st.header("📊 Dashboard")
+    st.header("📊 Performance Intelligence")
     try:
         stats = conn.read(worksheet="User_Stats", ttl=0)
         questions = conn.read(worksheet="Questions", ttl=0)
         
         if not stats.empty and not questions.empty:
-            # Data Cleaning
+            # Data Prep
             stats['qid'] = stats['question_id'].astype(str).str.split('.').str[0]
             questions['qid'] = questions['id'].astype(str).str.split('.').str[0]
             merged = pd.merge(stats, questions[['qid', 'topic_id']], on='qid')
             merged['Domain'] = merged['topic_id'].astype(str).str.split('.').str[0].map(TOPIC_MAP)
-            merged['is_correct'] = merged['is_correct'].astype(str).str.upper().replace({'0':'FALSE','1':'TRUE', '0.0':'FALSE', '1.0':'TRUE'})
+            merged['is_correct_bool'] = merged['is_correct'].astype(str).str.upper().replace({'0':False,'1':True, '0.0':False, '1.0':True, 'FALSE':False, 'TRUE':True})
+            
+            # KPI Hesaplamaları
+            total_solved = len(merged)
+            accuracy = (merged['is_correct_bool'].sum() / total_solved * 100) if total_solved > 0 else 0
+            
+            # En güçlü domain
+            domain_acc = merged.groupby('Domain')['is_correct_bool'].mean()
+            strongest_domain = domain_acc.idxmax() if not domain_acc.empty else "N/A"
 
+            # KPI Kartlarını Göster
+            k1, k2, k3 = st.columns(3)
+            k1.markdown(f'<div class="metric-container"><div class="metric-value">{total_solved}</div><div class="metric-label">Questions Solved</div></div>', unsafe_allow_html=True)
+            k2.markdown(f'<div class="metric-container"><div class="metric-value">%{accuracy:.1f}</div><div class="metric-label">Global Accuracy</div></div>', unsafe_allow_html=True)
+            k3.markdown(f'<div class="metric-container"><div class="metric-value" style="font-size:18px; padding-top:8px;">{strongest_domain}</div><div class="metric-label">Strongest Domain</div></div>', unsafe_allow_html=True)
+            
+            st.write("---")
+
+            # Grafikler (Eski düzen)
             c1, c2 = st.columns([1,2])
+            merged['is_correct_str'] = merged['is_correct_bool'].apply(lambda x: 'TRUE' if x else 'FALSE')
+            
             with c1:
-                st.plotly_chart(px.pie(merged, names='is_correct', title="Overall Success Rate", 
+                st.plotly_chart(px.pie(merged, names='is_correct_str', title="Accuracy Distribution", 
                                        color_discrete_map={'TRUE':'#2ecc71','FALSE':'#e74c3c'}), use_container_width=True)
                 
-                # Hata Analizi
-                error_data = merged[merged['is_correct'] == 'FALSE'].copy()
-                if not error_data.empty:
-                    error_data['error_reason'] = error_data['error_reason'].replace({'Interpretation': 'Logic'})
-                    st.plotly_chart(px.pie(error_data, names='error_reason', title="Error Breakdown", hole=0.4), use_container_width=True)
-                else:
-                    st.success("🎉 No errors recorded yet!")
+                err = merged[merged['is_correct_str'] == 'FALSE']
+                if not err.empty:
+                    st.plotly_chart(px.pie(err, names='error_reason', title="Error Root Causes", hole=0.5), use_container_width=True)
             
             with c2:
-                # Proficiency Table
-                perf = merged.groupby('Domain')['is_correct'].value_counts(normalize=True).unstack().fillna(0) * 100
+                perf = merged.groupby('Domain')['is_correct_str'].value_counts(normalize=True).unstack().fillna(0) * 100
                 if 'TRUE' in perf.columns:
-                    st.subheader("Success by Domain (%)")
-                    st.dataframe(perf[['TRUE']].rename(columns={'TRUE': 'Success %'}).style.format("{:.1f}"), use_container_width=True)
+                    st.subheader("Domain Mastery Matrix (%)")
+                    st.dataframe(perf[['TRUE']].rename(columns={'TRUE': 'Success %'}).style.format("{:.1f}").bar(color='#2ecc71'), use_container_width=True)
                 
-                st.plotly_chart(px.bar(merged, x='Domain', color='is_correct', barmode='group', title="Count by Domain"), use_container_width=True)
-        else: st.info("No data available yet.")
-    except Exception as e: st.error(f"Waiting for data... ({str(e)})")
+                st.plotly_chart(px.bar(merged, x='Domain', color='is_correct_str', barmode='group', title="Raw Volume Analysis"), use_container_width=True)
+        else: st.info("Awaiting mission data. Initiate a sprint to gather intelligence.")
+    except Exception as e: st.error(f"System Error: {str(e)}")
 
 # --- 8. ADMIN VIEW ---
 elif st.session_state.view == 'Admin':
     if not st.session_state.admin_auth:
-        if st.text_input("Password", type="password") == "1234": st.session_state.admin_auth = True; st.rerun()
+        if st.text_input("Enter Clearance Code", type="password") == "1234": st.session_state.admin_auth = True; st.rerun()
     else:
-        st.subheader("Bulk Upload")
-        up = st.file_uploader("Upload Excel", type=['xlsx'])
-        if up and st.button("Sync Questions"):
+        st.subheader("💾 Database Injection")
+        up = st.file_uploader("Upload Question Data (.xlsx)", type=['xlsx'])
+        if up and st.button("Execute Sync"):
             try:
-                current_data = conn.read(worksheet="Questions", ttl=0)
-                new_data = pd.read_excel(up)
-                combined = pd.concat([current_data, new_data], ignore_index=True)
-                conn.update(worksheet="Questions", data=combined)
-                st.success("Database updated successfully!")
-            except Exception as e: st.error(f"Error: {e}")
+                curr = conn.read(worksheet="Questions", ttl=0)
+                new = pd.read_excel(up)
+                conn.update(worksheet="Questions", data=pd.concat([curr, new], ignore_index=True))
+                st.success("Data injection successful.")
+            except Exception as e: st.error(f"Injection Failed: {e}")
