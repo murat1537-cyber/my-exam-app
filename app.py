@@ -67,11 +67,11 @@ st.markdown("""
 # --- 3. CONNECTION & STATE ---
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# Session State Tanımları
+# Session State Tanımları (2FA Durumları Eklendi)
 defaults = {
     'is_logged_in': False, 'current_user': None,
     'login_step': 'credentials', # 'credentials' veya '2fa'
-    'temp_user_data': None, # 2FA aşamasında kullanıcı verisini tutmak için
+    'temp_user_data': None,      # 2FA doğrulaması sırasında geçici veri
     'q_idx': 0, 'view': 'Main', 'feedback': None, 'smart_list': None,
     'start_time': None, 'admin_auth': False, 'is_sprint_active': False,
     'mode': 'Normal', 'sprint_type': 'Time', 'sprint_target': 600,
@@ -81,7 +81,7 @@ defaults = {
 for k, v in defaults.items():
     if k not in st.session_state: st.session_state[k] = v
 
-# --- 4. AUTH & HELPER FUNCTIONS ---
+# --- 4. AUTH HELPER FUNCTIONS ---
 def get_all_users():
     try:
         # Cache kullanmıyoruz (ttl=0) çünkü yeni kayıtları anlık görmeliyiz
@@ -100,7 +100,7 @@ def register_new_user(username, email, password, gdpr):
         if username in users['username'].values: return False, "Username already exists!"
         if 'email' in users.columns and email in users['email'].values: return False, "Email already registered!"
     
-    # 2fa_secret sütunu ile yeni kayıt oluştur
+    # 2fa_secret sütunu eklendi
     new_user = pd.DataFrame([{
         "username": username, "email": email, "password": password,
         "is_2fa_enabled": "FALSE", "gdpr_consent": "TRUE" if gdpr else "FALSE",
@@ -138,7 +138,7 @@ def disable_2fa_for_user(username):
         return True
     return False
 
-# --- 5. LOGIN FLOW (2FA DESTEKLİ) ---
+# --- 5. LOGIN FLOW (2FA ENTEGRE EDİLDİ) ---
 if not st.session_state.is_logged_in:
     c1, c2, c3 = st.columns([1, 2, 1])
     with c2:
@@ -161,22 +161,23 @@ if not st.session_state.is_logged_in:
                             st.session_state.is_logged_in = True
                             st.session_state.current_user = l_u
                             st.rerun()
-                    else:
-                        st.error("Invalid credentials.")
+                    else: st.error("Invalid credentials.")
             
             elif st.session_state.login_step == '2fa':
                 st.info("🔐 Enter 2FA Code")
                 otp = st.text_input("Authenticator Code", max_chars=6)
                 cb, cv = st.columns(2)
-                if cb.button("Back"): st.session_state.login_step = 'credentials'; st.rerun()
-                if cv.button("Verify", type="primary"):
-                    sec = st.session_state.temp_user_data.get('2fa_secret', '')
-                    if sec and pyotp.TOTP(sec).verify(otp):
-                        st.session_state.is_logged_in = True
-                        st.session_state.current_user = st.session_state.temp_user_data['username']
-                        st.session_state.login_step = 'credentials'
-                        st.rerun()
-                    else: st.error("Invalid Code")
+                with cb:
+                    if st.button("Back"): st.session_state.login_step = 'credentials'; st.rerun()
+                with cv:
+                    if st.button("Verify", type="primary"):
+                        sec = st.session_state.temp_user_data.get('2fa_secret', '')
+                        if sec and pyotp.TOTP(sec).verify(otp):
+                            st.session_state.is_logged_in = True
+                            st.session_state.current_user = st.session_state.temp_user_data['username']
+                            st.session_state.login_step = 'credentials'
+                            st.rerun()
+                        else: st.error("Invalid Code")
 
         with tab2:
             s_u = st.text_input("Username", key="s_u"); s_e = st.text_input("Email", key="s_e"); s_p = st.text_input("Password", type="password", key="s_p"); s_g = st.checkbox("GDPR Consent", key="s_g")
@@ -240,6 +241,7 @@ def start_review():
     try:
         stats = conn.read(worksheet="User_Stats", ttl=0)
         stats = stats[stats['user_id'] == st.session_state.current_user]
+        # Robust boolean cleaning for review mode too
         stats['is_correct_val'] = stats['is_correct'].apply(clean_boolean)
         wrong_ids = stats[stats['is_correct_val'] == 0]['question_id'].unique()
         if len(wrong_ids) == 0: st.success("🎉 No errors!"); return
@@ -283,7 +285,7 @@ with st.sidebar:
 if st.session_state.view == 'Main':
     st.title("🛡️ CISSP Mentor Pro")
     
-    # 2FA SETUP UI
+    # 2FA SETUP UI (Eğer butona basıldıysa)
     if st.session_state.get('show_2fa_setup', False):
         st.markdown("### 🔐 Two-Factor Setup")
         users_df = get_all_users()
@@ -297,8 +299,11 @@ if st.session_state.view == 'Main':
             st.warning("⚠️ 2FA Disabled.")
             if 'temp_secret' not in st.session_state: st.session_state.temp_secret = pyotp.random_base32()
             sec = st.session_state.temp_secret
+            
+            # QR Kod Oluşturma
             uri = pyotp.TOTP(sec).provisioning_uri(name=st.session_state.current_user, issuer_name="CISSP Mentor")
             img = io.BytesIO(); qrcode.make(uri).save(img, format='PNG')
+            
             c_qr, c_vf = st.columns([1, 2])
             with c_qr: st.image(img.getvalue(), width=200)
             with c_vf:
@@ -421,7 +426,5 @@ elif st.session_state.view == 'Admin':
         st.subheader("Data Sync")
         up = st.file_uploader("Questions (.xlsx)", type=['xlsx'])
         if up and st.button("Sync"):
-            try:
-                c = conn.read(worksheet="Questions", ttl=0); n = pd.read_excel(up)
-                conn.update(worksheet="Questions", data=pd.concat([c, n], ignore_index=True)); st.success("Synced.")
-            except Exception as e: st.error(e)
+            c = conn.read(worksheet="Questions", ttl=0); n = pd.read_excel(up)
+            conn.update(worksheet="Questions", data=pd.concat([c, n], ignore_index=True)); st.success("Synced.")
