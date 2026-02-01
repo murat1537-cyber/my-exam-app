@@ -27,7 +27,7 @@ st.markdown("""
     <style>
     .stApp { background-color: #f8f9fa; }
     
-    /* MOBİL UYUMLU BUTONLAR */
+    /* BUTONLAR */
     div.stButton > button {
         width: 100%; border-radius: 12px !important; border: 1px solid #e0e0e0;
         padding: 10px !important; font-size: 20px !important; font-weight: 500 !important;
@@ -49,7 +49,7 @@ st.markdown("""
         font-weight: 700 !important; min-height: 80px;
     }
 
-    /* KART TASARIMLARI */
+    /* KARTLAR */
     .q-card { background: white; padding: 25px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); border-top: 6px solid #2c3e50; margin-bottom: 25px; }
     .q-card h3 { font-size: 24px !important; line-height: 1.5 !important; color: #2d3436 !important; font-weight: 700 !important; }
     .profile-card { background: white; padding: 15px; border-radius: 12px; text-align: center; border: 1px solid #eee; margin-bottom: 20px; }
@@ -57,7 +57,7 @@ st.markdown("""
     .metric-num { font-size: 28px; font-weight: 800; color: #2c3e50; }
     .metric-lbl { font-size: 14px; text-transform: uppercase; color: #636e72; margin-top: 5px; }
     
-    /* LOGIN ve UYARILAR */
+    /* LOGIN KUTUSU */
     .login-container { max-width: 450px; margin: 30px auto; padding: 30px; background: white; border-radius: 20px; box-shadow: 0 10px 40px rgba(0,0,0,0.1); }
     .timer-box { font-size: 22px; font-weight: 800; color: #e74c3c; text-align: center; background: #fff5f5; border-radius: 8px; padding: 10px; margin-bottom: 15px; border: 1px solid #feb2b2; }
     .explanation-box { background-color: #e3fcf7; padding: 15px; border-radius: 10px; border-left: 5px solid #00b894; margin-top: 15px; color: #006266; font-size: 18px !important; }
@@ -67,6 +67,7 @@ st.markdown("""
 # --- 3. CONNECTION & STATE ---
 conn = st.connection("gsheets", type=GSheetsConnection)
 
+# Session State (2FA değişkenleri eklendi)
 defaults = {
     'is_logged_in': False, 'current_user': None,
     'login_step': 'credentials', # 'credentials' -> '2fa'
@@ -80,7 +81,7 @@ defaults = {
 for k, v in defaults.items():
     if k not in st.session_state: st.session_state[k] = v
 
-# --- 4. AUTH FUNCTIONS (SİZİN EXCEL YAPINIZA GÖRE) ---
+# --- 4. AUTH & HELPER FUNCTIONS ---
 def get_all_users():
     try:
         # Cache yok, güncel kullanıcı listesi lazım
@@ -218,7 +219,7 @@ def get_user_rank(df):
     else: return "👑 CISO Master", c
 
 def prepare_sprint_data(dom):
-    # Kota koruması için 10 dk (600sn) önbellek
+    # Kota hatasını önlemek için soruları 10 dk (600sn) önbellekte tutuyoruz
     q = conn.read(worksheet="Questions", ttl=600)
     if dom != "All Domains (Mix)":
         tid = [k for k, v in TOPIC_MAP.items() if v == dom][0]
@@ -240,6 +241,7 @@ def start_review():
     try:
         stats = conn.read(worksheet="User_Stats", ttl=0)
         stats = stats[stats['user_id'] == st.session_state.current_user]
+        # Robust boolean cleaning for review mode too
         stats['is_correct_val'] = stats['is_correct'].apply(clean_boolean)
         wrong_ids = stats[stats['is_correct_val'] == 0]['question_id'].unique()
         if len(wrong_ids) == 0: st.success("🎉 No errors!"); return
@@ -268,7 +270,7 @@ with st.sidebar:
     if st.button("🏠 Home"): st.session_state.is_sprint_active = False; st.session_state.view = 'Main'; st.session_state.show_2fa_setup = False; st.rerun()
     if st.button("📊 Analytics"): st.session_state.is_sprint_active = False; st.session_state.view = 'Analytics'; st.session_state.show_2fa_setup = False; st.rerun()
     
-    # 2FA AYAR BUTONU
+    # 2FA SETUP BUTTON
     if st.button("🔐 2FA Settings"):
         st.session_state.is_sprint_active = False
         st.session_state.view = 'Main'
@@ -283,7 +285,7 @@ with st.sidebar:
 if st.session_state.view == 'Main':
     st.title("🛡️ CISSP Mentor Pro")
     
-    # 2FA KURULUM EKRANI (Ana ekranda gösterilir)
+    # 2FA SETUP UI (Eğer butona basıldıysa)
     if st.session_state.get('show_2fa_setup', False):
         st.markdown("### 🔐 Two-Factor Setup")
         users_df = get_all_users()
@@ -402,7 +404,7 @@ elif st.session_state.view == 'Analytics':
             merged = pd.merge(stats, questions[['qid', 'topic_id']], on='qid')
             merged['Domain'] = merged['topic_id'].astype(str).str.split('.').str[0].map(TOPIC_MAP)
             
-            # 0% Accuracy hatası fix
+            # Veri Temizliği: clean_boolean ile hataları önle
             merged['is_correct_val'] = merged['is_correct'].apply(clean_boolean)
             
             total_int = len(merged); acc = (merged['is_correct_val'].sum() / total_int * 100) if total_int > 0 else 0
