@@ -27,7 +27,7 @@ st.markdown("""
     <style>
     .stApp { background-color: #f8f9fa; }
     
-    /* BUTONLAR */
+    /* MOBİL UYUMLU BUTONLAR */
     div.stButton > button {
         width: 100%; border-radius: 12px !important; border: 1px solid #e0e0e0;
         padding: 10px !important; font-size: 20px !important; font-weight: 500 !important;
@@ -49,7 +49,7 @@ st.markdown("""
         font-weight: 700 !important; min-height: 80px;
     }
 
-    /* KARTLAR */
+    /* KART TASARIMLARI */
     .q-card { background: white; padding: 25px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); border-top: 6px solid #2c3e50; margin-bottom: 25px; }
     .q-card h3 { font-size: 24px !important; line-height: 1.5 !important; color: #2d3436 !important; font-weight: 700 !important; }
     .profile-card { background: white; padding: 15px; border-radius: 12px; text-align: center; border: 1px solid #eee; margin-bottom: 20px; }
@@ -57,7 +57,7 @@ st.markdown("""
     .metric-num { font-size: 28px; font-weight: 800; color: #2c3e50; }
     .metric-lbl { font-size: 14px; text-transform: uppercase; color: #636e72; margin-top: 5px; }
     
-    /* LOGIN KUTUSU */
+    /* LOGIN ve UYARILAR */
     .login-container { max-width: 450px; margin: 30px auto; padding: 30px; background: white; border-radius: 20px; box-shadow: 0 10px 40px rgba(0,0,0,0.1); }
     .timer-box { font-size: 22px; font-weight: 800; color: #e74c3c; text-align: center; background: #fff5f5; border-radius: 8px; padding: 10px; margin-bottom: 15px; border: 1px solid #feb2b2; }
     .explanation-box { background-color: #e3fcf7; padding: 15px; border-radius: 10px; border-left: 5px solid #00b894; margin-top: 15px; color: #006266; font-size: 18px !important; }
@@ -67,7 +67,6 @@ st.markdown("""
 # --- 3. CONNECTION & STATE ---
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# Session State (2FA değişkenleri eklendi)
 defaults = {
     'is_logged_in': False, 'current_user': None,
     'login_step': 'credentials', # 'credentials' -> '2fa'
@@ -81,7 +80,7 @@ defaults = {
 for k, v in defaults.items():
     if k not in st.session_state: st.session_state[k] = v
 
-# --- 4. AUTH & HELPER FUNCTIONS ---
+# --- 4. AUTH FUNCTIONS (SİZİN EXCEL YAPINIZA GÖRE) ---
 def get_all_users():
     try:
         # Cache yok, güncel kullanıcı listesi lazım
