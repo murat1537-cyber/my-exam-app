@@ -32,14 +32,14 @@ st.markdown("""
         width: 100%;
         border-radius: 12px !important;
         border: 1px solid #e0e0e0;
-        padding: 15px 10px !important;
-        font-size: 18px !important; /* Okunaklı boyut */
+        padding: 10px 10px !important;
+        font-size: 20px !important; /* Okunaklı boyut */
         font-weight: 500 !important;
         background-color: white;
         color: #2c3e50;
         box-shadow: 0 2px 5px rgba(0,0,0,0.05);
         height: auto !important; /* İçeriğe göre uzasın */
-        min-height: 60px; /* Mobilde parmakla basmak kolay olsun */
+        min-height: 70px; /* Mobilde parmakla basmak kolay olsun */
         white-space: normal !important; /* Uzun yazılar alt satıra geçsin */
         line-height: 1.4 !important;
     }
@@ -55,10 +55,10 @@ st.markdown("""
         background: linear-gradient(135deg, #FF6B6B 0%, #EE5253 100%);
         color: white !important;
         border: none;
-        font-size: 20px !important;
+        font-size: 22px !important;
         font-weight: 700 !important;
         box-shadow: 0 4px 10px rgba(238, 82, 83, 0.3);
-        min-height: 70px;
+        min-height: 80px;
     }
     
     /* Secondary Butonlar (Review - Turuncu/Sarı) */
@@ -68,7 +68,7 @@ st.markdown("""
         border: none;
         font-size: 20px !important;
         font-weight: 700 !important;
-        min-height: 70px;
+        min-height: 80px;
     }
 
     /* --- KART VE METİN TASARIMLARI --- */
@@ -76,14 +76,14 @@ st.markdown("""
     /* Soru Kartı */
     .q-card { 
         background: white; 
-        padding: 20px; 
+        padding: 25px; 
         border-radius: 16px; 
         box-shadow: 0 4px 20px rgba(0,0,0,0.08); 
         border-top: 6px solid #2c3e50; 
         margin-bottom: 25px; 
     }
     .q-card h3 {
-        font-size: 22px !important; /* Mobilde taşmayacak ideal boyut */
+        font-size: 24px !important; /* Mobilde taşmayacak ideal boyut */
         line-height: 1.5 !important;
         color: #2d3436 !important;
         font-weight: 700 !important;
@@ -100,15 +100,15 @@ st.markdown("""
     }
     
     /* Sayaçlar */
-    .timer-box { font-size: 20px; font-weight: bold; color: #e74c3c; text-align: center; background: #fff5f5; border-radius: 8px; padding: 10px; margin-bottom: 15px; border: 1px solid #feb2b2; }
+    .timer-box { font-size: 22px; font-weight: bold; color: #e74c3c; text-align: center; background: #fff5f5; border-radius: 8px; padding: 10px; margin-bottom: 15px; border: 1px solid #feb2b2; }
     
     /* Açıklama Kutusu */
-    .explanation-box { background-color: #e3fcf7; padding: 15px; border-radius: 10px; border-left: 5px solid #00b894; margin-top: 15px; color: #006266; font-size: 16px !important; }
+    .explanation-box { background-color: #e3fcf7; padding: 15px; border-radius: 10px; border-left: 5px solid #00b894; margin-top: 15px; color: #006266; font-size: 18px !important; }
     
     /* Dashboard Kartları */
     .metric-card { background: white; padding: 15px; border-radius: 12px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.05); height: 100%; border-bottom: 3px solid #74b9ff; }
-    .metric-num { font-size: 24px; font-weight: 800; color: #2c3e50; }
-    .metric-lbl { font-size: 12px; text-transform: uppercase; color: #636e72; margin-top: 5px; }
+    .metric-num { font-size: 28px; font-weight: 800; color: #2c3e50; }
+    .metric-lbl { font-size: 14px; text-transform: uppercase; color: #636e72; margin-top: 5px; }
 
     </style>
     """, unsafe_allow_html=True)
@@ -160,12 +160,9 @@ def start_sprint(mode_type, target_val, domain):
         st.error("No questions found for this domain.")
         return
 
-    # Soru çekme mantığı
     if mode_type == 'Time': 
-        # Zaman bazlıysa yeterince çok soru al
         count = min(len(q_df), 40)
     else:
-        # Soru bazlıysa tam sayı kadar al
         count = min(len(q_df), target_val)
 
     st.session_state.smart_list = q_df.sample(n=count).reset_index(drop=True)
@@ -183,7 +180,9 @@ def start_sprint(mode_type, target_val, domain):
 def start_review_sprint():
     try:
         stats_df = conn.read(worksheet="User_Stats", ttl=0)
-        stats_df['is_correct_bool'] = stats_df['is_correct'].astype(str).str.upper().replace({'0':False,'1':True,'FALSE':False,'TRUE':True,'0.0':False})
+        # Fix: Convert mixed types to boolean safely
+        stats_df['is_correct_bool'] = stats_df['is_correct'].astype(str).str.upper().map({'TRUE': True, 'FALSE': False, '1': True, '0': False, '1.0': True, '0.0': False})
+        
         wrong_ids = stats_df[stats_df['is_correct_bool'] == False]['question_id'].unique()
         
         if len(wrong_ids) == 0:
@@ -213,7 +212,7 @@ def start_review_sprint():
         st.rerun()
     except Exception as e: st.error(f"Review Error: {e}")
 
-# --- 5. SIDEBAR (SADECE NAVİGASYON VE PROFİL) ---
+# --- 5. SIDEBAR ---
 with st.sidebar:
     try:
         stats_preview = conn.read(worksheet="User_Stats", ttl=60)
@@ -245,18 +244,16 @@ with st.sidebar:
 
 # --- 6. VIEWS ---
 
-# A. MAIN VIEW (LOBBY - MOBİL İÇİN ANA EKRAN)
+# A. MAIN VIEW (LOBBY)
 if st.session_state.view == 'Main':
     st.title("🛡️ CISSP Mentor Pro")
     st.markdown("Ready to train? Select a mode to begin.")
     
-    # Domain Seçimi Ana Ekranda
     domain_options = ["All Domains (Mix)"] + list(TOPIC_MAP.values())
     selected_mode = st.selectbox("🎯 Target Domain:", domain_options)
     
     st.write("")
     
-    # Başlatma Butonları (Grid)
     c1, c2 = st.columns(2)
     with c1:
         if st.button("⏱️ 10 Min Sprint", type="primary", use_container_width=True):
@@ -270,13 +267,11 @@ if st.session_state.view == 'Main':
         if st.button("📝 10 Questions", type="primary", use_container_width=True):
             start_sprint('Count', 10, selected_mode)
     with c4:
-        # Review butonu farklı renkte (secondary)
         if st.button("↺ Review Errors", type="secondary", use_container_width=True):
             start_review_sprint()
 
-# B. STUDY VIEW (AKTİF SINAV)
+# B. STUDY VIEW
 elif st.session_state.view == 'Study' and st.session_state.smart_list is not None:
-    # --- Üst Bar ---
     c_timer, c_exit = st.columns([3, 1])
     with c_timer:
         ph = st.empty()
@@ -286,7 +281,6 @@ elif st.session_state.view == 'Study' and st.session_state.smart_list is not Non
             st.session_state.view = 'Main'
             st.rerun()
 
-    # Sayaç Mantığı
     should_end = False
     if st.session_state.sprint_type == 'Time':
         rem = max(0, int(st.session_state.sprint_target - (time.time() - st.session_state.start_time)))
@@ -303,7 +297,6 @@ elif st.session_state.view == 'Study' and st.session_state.smart_list is not Non
         st.session_state.view = 'Score_Summary'
         st.rerun()
 
-    # --- Soru Kartı ---
     if st.session_state.q_idx < len(st.session_state.smart_list):
         curr = st.session_state.smart_list.iloc[st.session_state.q_idx]
         topic_name = TOPIC_MAP.get(str(curr['topic_id']).split('.')[0], 'General')
@@ -316,12 +309,10 @@ elif st.session_state.view == 'Study' and st.session_state.smart_list is not Non
         </div>
         """, unsafe_allow_html=True)
         
-        # Cevap Şıkları (Tek sütun mobilde daha iyidir, geniş ekranda 2 sütun)
         c1, c2 = st.columns(2)
         opts = [('A', 'option_a'), ('B', 'option_b'), ('C', 'option_c'), ('D', 'option_d')]
         
         for i, (code, col) in enumerate(opts):
-            # Mobilde tek sütun gibi davranması için genişlik ayarı CSS'te yapıldı
             with (c1 if i%2==0 else c2):
                 if st.button(f"{code}) {curr[col]}", use_container_width=True):
                     st.session_state.feedback = (code == curr['correct_option'])
@@ -330,7 +321,6 @@ elif st.session_state.view == 'Study' and st.session_state.smart_list is not Non
                     st.session_state.sprint_total_attempted += 1
                     st.rerun()
 
-        # Feedback
         if st.session_state.feedback is not None:
             st.write("---")
             if st.session_state.feedback:
@@ -396,10 +386,17 @@ elif st.session_state.view == 'Analytics':
             questions['qid'] = questions['id'].astype(str).str.split('.').str[0]
             merged = pd.merge(stats, questions[['qid', 'topic_id']], on='qid')
             merged['Domain'] = merged['topic_id'].astype(str).str.split('.').str[0].map(TOPIC_MAP)
-            merged['is_correct_bool'] = merged['is_correct'].astype(str).str.upper().replace({'0':False,'1':True,'FALSE':False,'TRUE':True})
+            
+            # --- CRITICAL TYPE FIX ---
+            # Zorla sayısal değere (1/0) çevirme
+            merged['is_correct_val'] = merged['is_correct'].astype(str).str.upper().map({
+                'TRUE': 1, 'FALSE': 0, '1': 1, '0': 0, '1.0': 1, '0.0': 0
+            }).fillna(0).astype(int)
             
             total_int = len(merged)
-            acc = (merged['is_correct_bool'].sum() / total_int * 100) if total_int > 0 else 0
+            # Sayısal toplam alma (Artık string değil, int)
+            acc = (merged['is_correct_val'].sum() / total_int * 100) if total_int > 0 else 0
+            
             unique_q = merged['qid'].nunique()
             cov = (unique_q / len(questions) * 100) if len(questions) > 0 else 0
 
@@ -411,16 +408,19 @@ elif st.session_state.view == 'Analytics':
             st.write("---")
             
             c1, c2 = st.columns([1,2])
-            merged['res'] = merged['is_correct_bool'].apply(lambda x: 'TRUE' if x else 'FALSE')
+            # Görselleştirme için String versiyonunu ayrıca oluştur
+            merged['Result'] = merged['is_correct_val'].apply(lambda x: 'TRUE' if x == 1 else 'FALSE')
+            
             with c1:
-                st.plotly_chart(px.pie(merged, names='res', title="Success Ratio", color_discrete_map={'TRUE':'#2ecc71','FALSE':'#e74c3c'}), use_container_width=True)
+                st.plotly_chart(px.pie(merged, names='Result', title="Success Ratio", color_discrete_map={'TRUE':'#2ecc71','FALSE':'#e74c3c'}), use_container_width=True)
             with c2:
-                perf = merged.groupby('Domain')['res'].value_counts(normalize=True).unstack().fillna(0)*100
+                # Value counts on String column works fine
+                perf = merged.groupby('Domain')['Result'].value_counts(normalize=True).unstack().fillna(0)*100
                 if 'TRUE' in perf.columns:
                     st.subheader("Domain Mastery (%)")
                     st.dataframe(perf[['TRUE']].rename(columns={'TRUE':'%'}).style.format("{:.1f}").bar(color='#2ecc71'), use_container_width=True)
         else: st.info("No data.")
-    except Exception as e: st.error(str(e))
+    except Exception as e: st.error(f"Dashboard Error: {str(e)}")
 
 # E. ADMIN
 elif st.session_state.view == 'Admin':
