@@ -43,11 +43,12 @@ st.markdown("""
         color: white;
         text-align: center;
         margin-bottom: 20px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
     }
     .profile-rank { font-size: 14px; opacity: 0.9; letter-spacing: 1px; text-transform: uppercase; }
     .profile-name { font-size: 24px; font-weight: bold; margin: 10px 0; }
     
-    /* KPI Kartları (Analiz Sayfası) */
+    /* KPI Kartları */
     .metric-container {
         background: white;
         padding: 20px;
@@ -59,13 +60,43 @@ st.markdown("""
     .metric-value { font-size: 28px; font-weight: bold; color: #2c3e50; }
     .metric-label { font-size: 14px; color: #7f8c8d; text-transform: uppercase; }
     
+    /* DEV START BUTONU ÖZELLEŞTİRMESİ */
+    /* Sadece type="primary" olan butonu hedefler */
+    div.stButton > button[kind="primary"] {
+        background: linear-gradient(45deg, #FF512F 0%, #DD2476 100%);
+        color: white;
+        height: 80px; /* Daha yüksek */
+        font-size: 24px !important; /* Daha büyük yazı */
+        font-weight: 800;
+        border: none;
+        border-radius: 12px;
+        box-shadow: 0 10px 20px rgba(221, 36, 118, 0.3);
+        transition: all 0.3s ease;
+        animation: pulse 2s infinite;
+    }
+    div.stButton > button[kind="primary"]:hover {
+        transform: translateY(-3px) scale(1.02);
+        box-shadow: 0 15px 25px rgba(221, 36, 118, 0.4);
+    }
+    
+    /* Pulse Animasyonu */
+    @keyframes pulse {
+        0% { box-shadow: 0 0 0 0 rgba(221, 36, 118, 0.4); }
+        70% { box-shadow: 0 0 0 10px rgba(221, 36, 118, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(221, 36, 118, 0); }
+    }
+
+    /* Diğer Standart Butonlar */
+    div.stButton > button[kind="secondary"] {
+        border-radius: 8px; 
+        height: 3.2em; 
+        font-weight: 600; 
+        border: 1px solid #dfe6e9;
+    }
+
     /* Timer & Uyarılar */
     .timer-box { font-size: 22px; font-weight: 800; color: #e74c3c; text-align: center; background: #fadbd8; border-radius: 8px; padding: 12px; margin-bottom: 20px; }
     .explanation-box { background-color: #e8f6f3; padding: 20px; border-radius: 10px; border-left: 5px solid #1abc9c; margin-top: 15px; color: #16a085; }
-    
-    /* Butonlar */
-    .stButton>button { border-radius: 8px; height: 3.2em; font-weight: 600; width: 100%; border: none; transition: all 0.3s; }
-    .stButton>button:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
     </style>
     """, unsafe_allow_html=True)
 
@@ -103,11 +134,11 @@ def get_user_rank(df):
     elif count < 100: return "🟣 Security Architect", count
     else: return "👑 CISO Master", count
 
-# --- 5. SIDEBAR (PROFİL KARTI EKLENDİ) ---
+# --- 5. SIDEBAR ---
 with st.sidebar:
     # --- Profil Kartı ---
     try:
-        stats_preview = conn.read(worksheet="User_Stats", ttl=60) # Önbellekli okuma
+        stats_preview = conn.read(worksheet="User_Stats", ttl=60)
         rank, total_q = get_user_rank(stats_preview)
     except: rank, total_q = "Novice", 0
     
@@ -127,11 +158,14 @@ with st.sidebar:
         if st.button("🛑 Terminate Sprint"): 
             st.session_state.is_sprint_active = False; st.session_state.view = 'Analytics'; st.rerun()
     else:
-        st.subheader("⚙️ Mission Control")
+        st.subheader("📚 Study Configuration")
         domain_options = ["All Domains (Mix)"] + list(TOPIC_MAP.values())
         selected_mode = st.selectbox("Target Domain:", domain_options)
         
-        if st.button("🚀 Start 10-Min Sprint"):
+        st.write("") # Biraz boşluk bırak
+        
+        # --- DEV START BUTONU (type='primary' ile CSS hedeflendi) ---
+        if st.button("🚀 START SPRINT", type="primary", use_container_width=True):
             q_df = conn.read(worksheet="Questions", ttl=0)
             if selected_mode != "All Domains (Mix)":
                 target_id = [k for k, v in TOPIC_MAP.items() if v == selected_mode][0]
@@ -159,7 +193,6 @@ if st.session_state.view == 'Study' and st.session_state.smart_list is not None:
     curr = st.session_state.smart_list.iloc[st.session_state.q_idx]
     topic_name = TOPIC_MAP.get(str(curr['topic_id']).split('.')[0], 'General Domain')
     
-    # Yeni Kart Tasarımı
     st.markdown(f"""
     <div class="q-card">
         <div style="color:#7f8c8d; font-size:14px; margin-bottom:10px;">📍 DOMAIN: {topic_name.upper()}</div>
@@ -204,7 +237,7 @@ if st.session_state.view == 'Study' and st.session_state.smart_list is not None:
                 save_stat(st.session_state.last_q_id, False, "None", "Interpretation")
                 st.session_state.q_idx += 1; st.session_state.feedback = None; st.rerun()
 
-# --- 7. ANALYTICS VIEW (KPI KARTLARI EKLENDİ) ---
+# --- 7. ANALYTICS VIEW ---
 elif st.session_state.view == 'Analytics':
     st.header("📊 Performance Intelligence")
     try:
@@ -235,7 +268,7 @@ elif st.session_state.view == 'Analytics':
             
             st.write("---")
 
-            # Grafikler (Eski düzen)
+            # Grafikler
             c1, c2 = st.columns([1,2])
             merged['is_correct_str'] = merged['is_correct_bool'].apply(lambda x: 'TRUE' if x else 'FALSE')
             
