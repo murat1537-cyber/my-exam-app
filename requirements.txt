@@ -1,7 +1,8 @@
-# requirements.txt
 streamlit
+streamlit-gsheets
 pandas
 plotly
-gspread
-oauth2client
-streamlit-gsheets
+openpyxl
+pyotp
+qrcode
+pillow
