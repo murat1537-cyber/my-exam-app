@@ -6,9 +6,7 @@ from datetime import datetime
 import time
 import hashlib
 import secrets
-import pyotp
-import qrcode
-import io
+# import pyotp ve qrcode KALDIRILDI
 
 # --- 1. CISSP DOMAIN MAPPING ---
 TOPIC_MAP = {
@@ -29,26 +27,47 @@ st.markdown("""
     <style>
     .stApp { background-color: #f4f6f9; }
     
+    /* --- 1. SORU ŞIKLARI (VARSAYILAN BUTONLAR) --- */
     div.stButton > button {
-        width: 100%; border-radius: 12px !important; border: 2px solid #d1d8e0 !important;
-        padding: 15px 20px !important; font-size: 20px !important; font-weight: 600 !important;
-        background-color: #ffffff !important; color: #000000 !important;
-        min-height: 85px; white-space: normal !important; box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-        text-align: left !important; line-height: 1.5 !important; transition: all 0.2s ease;
-    }
-    div.stButton > button:hover { 
-        border-color: #3498db !important; background-color: #f0f8ff !important; 
-        color: #000000 !important; transform: translateY(-2px);
+        width: 100%; 
+        border-radius: 12px !important; 
+        border: 2px solid #d1d8e0 !important; 
+        padding: 15px 20px !important; 
+        font-size: 20px !important; /* BÜYÜK OKUNAKLI FONT */
+        font-weight: 600 !important;
+        background-color: #ffffff !important; /* BEMBEYAZ ZEMİN */
+        color: #000000 !important; /* TAM SİYAH YAZI */
+        min-height: 85px; 
+        white-space: normal !important; 
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        text-align: left !important; 
+        transition: all 0.2s ease;
+        line-height: 1.5 !important;
     }
     
+    div.stButton > button:hover { 
+        border-color: #3498db !important; 
+        background-color: #f0f8ff !important; 
+        color: #000000 !important; 
+        transform: translateY(-2px);
+    }
+    
+    /* --- 2. AKSİYON BUTONLARI (Primary) --- */
     div.stButton > button[kind="primary"] {
         background: linear-gradient(135deg, #FF6B6B 0%, #EE5253 100%) !important;
-        color: white !important; border: none !important; text-align: center !important; 
+        color: white !important; 
+        border: none !important;
+        text-align: center !important; 
         font-weight: 700 !important;
     }
+    
+    /* --- 3. NAVİGASYON BUTONLARI (Secondary) --- */
     div.stButton > button[kind="secondary"] {
-        background-color: #dfe6e9 !important; color: #2d3436 !important;
-        border: 1px solid #b2bec3 !important; text-align: center !important; font-size: 18px !important;
+        background-color: #dfe6e9 !important;
+        color: #2d3436 !important;
+        border: 1px solid #b2bec3 !important;
+        text-align: center !important;
+        font-size: 18px !important;
     }
 
     .q-card { background: white; padding: 35px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); border-top: 6px solid #2c3e50; margin-bottom: 25px; }
@@ -77,34 +96,24 @@ defaults = {
 for k, v in defaults.items():
     if k not in st.session_state: st.session_state[k] = v
 
-# --- 4. SECURITY & AUTH FUNCTIONS (NEW) ---
+# --- 4. SECURITY & AUTH FUNCTIONS ---
 
 def hash_password(password, salt=None):
-    """Şifreyi tuzlayıp hashlere çevirir."""
     if salt is None:
-        salt = secrets.token_hex(8) # 16 karakterlik rastgele tuz
-    # Tuz + Şifre birleşimini SHA256 ile hashle
+        salt = secrets.token_hex(8)
     hashed = hashlib.sha256((salt + password).encode('utf-8')).hexdigest()
-    # Veritabanına kaydedilecek format: tuz|hash
     return f"{salt}|{hashed}"
 
 def check_password(stored_password, input_password):
-    """
-    Girilen şifreyi, kayıtlı hash ile karşılaştırır.
-    Eski (plaintext) şifreleri de destekler.
-    """
     stored_password = str(stored_password).strip()
     input_password = str(input_password).strip()
     
-    # 1. Eğer şifre '|' içeriyorsa Hashlenmiştir
     if '|' in stored_password:
         salt, hashed = stored_password.split('|', 1)
-        # Girilen şifreyi aynı tuz ile hashle ve karşılaştır
         new_hash = hashlib.sha256((salt + input_password).encode('utf-8')).hexdigest()
         return new_hash == hashed
     else:
-        # 2. Legacy Support (Eski düz metin şifreler için)
-        # 1234.0 gibi float sorunlarını temizle
+        # Legacy support
         if stored_password.endswith('.0'): stored_password = stored_password[:-2]
         return stored_password == input_password
 
@@ -121,7 +130,6 @@ def register_new_user(username, email, password, gdpr):
     if not users.empty:
         if username in users['username'].astype(str).str.strip().values: return False, "Username exists!"
     
-    # Şifreyi Hashle
     secure_password = hash_password(str(password).strip())
     
     new_user = pd.DataFrame([{
@@ -143,7 +151,6 @@ def verify_login(username, password):
     
     if not user_record.empty:
         stored_pass = user_record.iloc[0]['password']
-        # Yeni Güvenli Kontrol Fonksiyonunu Kullan
         if check_password(stored_pass, password):
             role = user_record.iloc[0].get('role', 'User')
             if pd.isna(role) or str(role).strip() == '': role = 'User'
@@ -368,7 +375,7 @@ elif st.session_state.view == 'Study' and st.session_state.smart_list is not Non
 elif st.session_state.view == 'Score_Summary':
     sc = st.session_state.sprint_score; tot = st.session_state.sprint_total_attempted
     ac = (sc / tot * 100) if tot > 0 else 0
-    st.markdown(f"""<div style="text-align:center; padding: 60px; background:white; border-radius:20px; box-shadow:0 10px 30px rgba(0,0,0,0.1); margin-top:20px;"><h1 style="color:#2c3e50; font-size: 45px;">🏁 Sprint Finished!</h1><div style="font-size: 90px; font-weight: 800; color:#0d6efd; margin: 20px 0;">{sc} / {tot}</div><h3 style="color:#6c757d; letter-spacing:2px;">ACCURACY: {ac:.1f}%</h3></div>""", unsafe_allow_html=True)
+    st.markdown(f"""<div style="text-align:center; padding: 60px; background:white; border-radius:20px; box-shadow:0 10px 30px rgba(0,0,0,0.1); margin-top:20px;"><h1 style="color:#2c3e50; font-size: 45px;">🏁 Sprint Finished!</h1><div style="font-size: 90px; font-weight: 800; color:#FF6B6B; margin: 20px 0;">{sc} / {tot}</div><h3 style="color:#6c757d; letter-spacing:2px;">ACCURACY: {ac:.1f}%</h3></div>""", unsafe_allow_html=True)
     st.write("")
     c1, c2 = st.columns(2)
     if c1.button("🏠 Home", use_container_width=True, type="primary"): st.session_state.view = 'Main'; st.rerun()
