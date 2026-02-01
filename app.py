@@ -53,20 +53,38 @@ def save_stat(q_id, correct, confidence, reason):
         conn.update(worksheet="User_Stats", data=updated_df)
     except: pass 
 
-# --- 5. SIDEBAR ---
+# --- 5. SIDEBAR (YENİLENEN KISIM) ---
 with st.sidebar:
     st.title("🛡️ CISSP Mentor")
+    
     if st.session_state.is_sprint_active:
+        st.info("🟢 Exam in Progress")
         if st.button("▶️ Return to Sprint"): st.session_state.view = 'Study'; st.rerun()
         if st.button("🛑 Terminate Sprint"): 
             st.session_state.is_sprint_active = False; st.session_state.view = 'Analytics'; st.rerun()
     else:
+        st.subheader("📚 Study Configuration")
+        # Domain Seçim Kutusu
+        domain_options = ["All Domains (Mix)"] + list(TOPIC_MAP.values())
+        selected_mode = st.selectbox("Select Domain:", domain_options)
+        
         if st.button("🚀 Start 10-Min Sprint"):
             q_df = conn.read(worksheet="Questions", ttl=0)
-            sample_n = min(len(q_df), 25)
-            st.session_state.smart_list = q_df.sample(n=sample_n).reset_index(drop=True)
-            st.session_state.q_idx = 0; st.session_state.start_time = time.time()
-            st.session_state.is_sprint_active = True; st.session_state.view = 'Study'; st.rerun()
+            
+            # Domain Filtreleme Mantığı
+            if selected_mode != "All Domains (Mix)":
+                # Seçilen ismin ID'sini bul (Tersine arama)
+                target_id = [k for k, v in TOPIC_MAP.items() if v == selected_mode][0]
+                # Veriyi filtrele (String/Float hatasını önleyerek)
+                q_df = q_df[q_df['topic_id'].astype(str).str.split('.').str[0] == target_id]
+            
+            if q_df.empty:
+                st.error(f"No questions found for '{selected_mode}'. Please upload questions first.")
+            else:
+                sample_n = min(len(q_df), 25)
+                st.session_state.smart_list = q_df.sample(n=sample_n).reset_index(drop=True)
+                st.session_state.q_idx = 0; st.session_state.start_time = time.time()
+                st.session_state.is_sprint_active = True; st.session_state.view = 'Study'; st.rerun()
     
     st.write("---")
     if st.button("📊 Analytics"): st.session_state.view = 'Analytics'
@@ -142,14 +160,12 @@ elif st.session_state.view == 'Analytics':
 
             c1, c2 = st.columns([1,2])
             with c1:
-                # 1. Genel Başarı Grafiği
                 st.plotly_chart(px.pie(merged, names='is_correct', title="Overall Success Rate", 
                                        color_discrete_map={'TRUE':'#2ecc71','FALSE':'#e74c3c'}), use_container_width=True)
                 
-                # 2. Hata Analizi Grafiği (YENİ!)
+                # Hata Analizi
                 error_data = merged[merged['is_correct'] == 'FALSE'].copy()
                 if not error_data.empty:
-                    # 'Interpretation' verisini 'Logic' olarak göster
                     error_data['error_reason'] = error_data['error_reason'].replace({'Interpretation': 'Logic'})
                     st.plotly_chart(px.pie(error_data, names='error_reason', title="Error Breakdown", hole=0.4), use_container_width=True)
                 else:
@@ -162,7 +178,6 @@ elif st.session_state.view == 'Analytics':
                     st.subheader("Success by Domain (%)")
                     st.dataframe(perf[['TRUE']].rename(columns={'TRUE': 'Success %'}).style.format("{:.1f}"), use_container_width=True)
                 
-                # Domain Bar Chart
                 st.plotly_chart(px.bar(merged, x='Domain', color='is_correct', barmode='group', title="Count by Domain"), use_container_width=True)
         else: st.info("No data available yet.")
     except Exception as e: st.error(f"Waiting for data... ({str(e)})")
