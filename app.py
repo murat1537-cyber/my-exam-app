@@ -5,16 +5,7 @@ import plotly.express as px
 from datetime import datetime
 import time
 
-# --- 1. KULLANICI LİSTESİ (Buraya istediğin kadar kişi ekleyebilirsin) ---
-# Format: "Kullanıcı Adı": "Şifre"
-USERS = {
-    "Admin": "1234",
-    "Ali": "0000",
-    "Ayse": "1111",
-    "Mehmet": "2222"
-}
-
-# --- 2. CISSP DOMAIN MAPPING ---
+# --- 1. CISSP DOMAIN MAPPING ---
 TOPIC_MAP = {
     "1": "Security and Risk Management",
     "2": "Asset Security",
@@ -26,59 +17,134 @@ TOPIC_MAP = {
     "8": "Software Development Security"
 }
 
-# --- 3. CONFIGURATION & CSS ---
+# --- 2. CONFIGURATION & MOBILE CSS ---
 st.set_page_config(page_title="CISSP AI Mentor", page_icon="🛡️", layout="wide")
 
 st.markdown("""
     <style>
-    .stApp { background-color: #f4f6f9; }
-    div.stButton > button { width: 100%; border-radius: 12px !important; padding: 10px !important; font-size: 20px !important; font-weight: 500 !important; background-color: white; color: #2c3e50; border: 1px solid #e0e0e0; min-height: 70px; white-space: normal !important; }
+    .stApp { background-color: #f8f9fa; }
+    
+    /* BUTONLAR */
+    div.stButton > button {
+        width: 100%; border-radius: 12px !important; border: 1px solid #e0e0e0;
+        padding: 10px !important; font-size: 20px !important; font-weight: 500 !important;
+        background-color: white; color: #2c3e50; min-height: 70px;
+        white-space: normal !important; box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    }
     div.stButton > button:hover { border-color: #3498db; color: #3498db; }
-    div.stButton > button[kind="primary"] { background: linear-gradient(135deg, #FF6B6B 0%, #EE5253 100%); color: white !important; border: none; font-size: 22px !important; font-weight: 700 !important; min-height: 80px; }
-    div.stButton > button[kind="secondary"] { background: linear-gradient(135deg, #f0932b 0%, #ffbe76 100%); color: white !important; border: none; font-size: 20px !important; font-weight: 700 !important; min-height: 80px; }
+    
+    div.stButton > button[kind="primary"] {
+        background: linear-gradient(135deg, #FF6B6B 0%, #EE5253 100%);
+        color: white !important; border: none; font-size: 22px !important;
+        font-weight: 700 !important; min-height: 80px;
+        box-shadow: 0 4px 10px rgba(238, 82, 83, 0.3);
+    }
+    
+    div.stButton > button[kind="secondary"] {
+        background: linear-gradient(135deg, #f0932b 0%, #ffbe76 100%);
+        color: white !important; border: none; font-size: 20px !important;
+        font-weight: 700 !important; min-height: 80px;
+    }
+
+    /* KARTLAR */
     .q-card { background: white; padding: 25px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); border-top: 6px solid #2c3e50; margin-bottom: 25px; }
     .q-card h3 { font-size: 24px !important; line-height: 1.5 !important; color: #2d3436 !important; font-weight: 700 !important; }
     .profile-card { background: white; padding: 15px; border-radius: 12px; text-align: center; border: 1px solid #eee; margin-bottom: 20px; }
-    .timer-box { font-size: 22px; font-weight: bold; color: #e74c3c; text-align: center; background: #fff5f5; border-radius: 8px; padding: 10px; margin-bottom: 15px; border: 1px solid #feb2b2; }
-    .explanation-box { background-color: #e3fcf7; padding: 15px; border-radius: 10px; border-left: 5px solid #00b894; margin-top: 15px; color: #006266; font-size: 18px !important; }
     .metric-card { background: white; padding: 15px; border-radius: 12px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.05); height: 100%; border-bottom: 3px solid #74b9ff; }
     .metric-num { font-size: 28px; font-weight: 800; color: #2c3e50; }
     .metric-lbl { font-size: 14px; text-transform: uppercase; color: #636e72; margin-top: 5px; }
     
-    /* Login Ekranı için Stil */
-    .login-box { max-width: 400px; margin: 100px auto; padding: 40px; background: white; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); text-align: center; }
+    /* LOGIN KUTUSU */
+    .login-container { max-width: 450px; margin: 30px auto; padding: 30px; background: white; border-radius: 20px; box-shadow: 0 10px 40px rgba(0,0,0,0.1); }
+    .timer-box { font-size: 22px; font-weight: 800; color: #e74c3c; text-align: center; background: #fff5f5; border-radius: 8px; padding: 10px; margin-bottom: 15px; border: 1px solid #feb2b2; }
+    .explanation-box { background-color: #e3fcf7; padding: 15px; border-radius: 10px; border-left: 5px solid #00b894; margin-top: 15px; color: #006266; font-size: 18px !important; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 4. SESSION STATE ---
+# --- 3. CONNECTION & STATE ---
+conn = st.connection("gsheets", type=GSheetsConnection)
+
 if 'is_logged_in' not in st.session_state: st.session_state.is_logged_in = False
 if 'current_user' not in st.session_state: st.session_state.current_user = None
 
-# --- 5. GİRİŞ KONTROLÜ (LOGIN LOGIC) ---
+# --- 4. AUTH HELPER FUNCTIONS (GÜNCELLENDİ: Sizin Tablo Yapınıza Göre) ---
+def get_all_users():
+    try:
+        return conn.read(worksheet="Users", ttl=0)
+    except:
+        # Tablo boşsa veya okunamazsa default structure
+        return pd.DataFrame(columns=["username", "email", "password", "is_2fa_enabled", "gdpr_consent"])
+
+def register_new_user(username, email, password, gdpr):
+    users = get_all_users()
+    
+    # Kullanıcı adı veya E-mail kontrolü
+    if not users.empty:
+        if username in users['username'].values:
+            return False, "Username already exists!"
+        if 'email' in users.columns and email in users['email'].values:
+            return False, "Email already registered!"
+    
+    # Sizin Excel yapınıza uygun kayıt satırı
+    new_user = pd.DataFrame([{
+        "username": username,
+        "email": email,
+        "password": password,
+        "is_2fa_enabled": "FALSE", # Şimdilik default kapalı
+        "gdpr_consent": "TRUE" if gdpr else "FALSE"
+    }])
+    
+    updated_users = pd.concat([users, new_user], ignore_index=True)
+    conn.update(worksheet="Users", data=updated_users)
+    return True, "Account created! Please login."
+
+def verify_login(username, password):
+    users = get_all_users()
+    if not users.empty:
+        user_record = users[users['username'] == username]
+        if not user_record.empty and str(user_record.iloc[0]['password']) == str(password):
+            return True
+    return False
+
+# --- 5. LOGIN / SIGNUP SCREEN ---
 if not st.session_state.is_logged_in:
-    c1, c2, c3 = st.columns([1,2,1])
+    c1, c2, c3 = st.columns([1, 2, 1])
     with c2:
-        st.markdown('<div class="login-box"><h2>🛡️ CISSP Mentor</h2>', unsafe_allow_html=True)
-        username = st.text_input("Username")
-        password = st.text_input("Password", type="password")
+        st.markdown('<div class="login-container"><h2 style="text-align:center;">🛡️ CISSP Access Portal</h2>', unsafe_allow_html=True)
         
-        if st.button("Login", type="primary"):
-            if username in USERS and USERS[username] == password:
-                st.session_state.is_logged_in = True
-                st.session_state.current_user = username
-                st.rerun()
-            else:
-                st.error("Invalid credentials")
+        tab1, tab2 = st.tabs(["🔑 Login", "📝 Sign Up"])
+        
+        with tab1:
+            l_user = st.text_input("Username", key="l_user")
+            l_pass = st.text_input("Password", type="password", key="l_pass")
+            if st.button("Login", type="primary", key="btn_login"):
+                if verify_login(l_user, l_pass):
+                    st.session_state.is_logged_in = True
+                    st.session_state.current_user = l_user
+                    st.rerun()
+                else:
+                    st.error("Invalid credentials.")
+        
+        with tab2:
+            s_user = st.text_input("Username", key="s_user")
+            s_email = st.text_input("Email", key="s_email") # Yeni alan
+            s_pass = st.text_input("Password", type="password", key="s_pass")
+            s_gdpr = st.checkbox("I agree to GDPR data processing", key="s_gdpr") # Yeni alan
+            
+            if st.button("Create Account", type="secondary", key="btn_signup"):
+                if s_user and s_pass and s_email and s_gdpr:
+                    success, msg = register_new_user(s_user, s_email, s_pass, s_gdpr)
+                    if success: st.success(msg)
+                    else: st.error(msg)
+                else:
+                    st.warning("All fields (and GDPR consent) are required.")
+        
         st.markdown('</div>', unsafe_allow_html=True)
-        
-    # Kodu burada durdurur, aşağıdaki ana uygulamayı çalıştırmaz
     st.stop()
 
 # ==========================================
-# BURADAN AŞAĞISI MEVCUT UYGULAMANIZDIR
+# ANA UYGULAMA
 # ==========================================
-
-conn = st.connection("gsheets", type=GSheetsConnection)
 
 defaults = {
     'q_idx': 0, 'view': 'Main', 'feedback': None, 'smart_list': None,
@@ -89,12 +155,12 @@ defaults = {
 for k, v in defaults.items():
     if k not in st.session_state: st.session_state[k] = v
 
-# --- DATA FUNCTIONS ---
+# --- CORE FUNCTIONS ---
 def save_stat(q_id, correct, confidence, reason):
     try:
         existing_df = conn.read(worksheet="User_Stats", ttl=0)
         new_row = pd.DataFrame([{
-            "user_id": st.session_state.current_user, # ARTIK DİNAMİK KULLANICI!
+            "user_id": st.session_state.current_user,
             "question_id": str(q_id),
             "is_correct": "TRUE" if correct else "FALSE",
             "confidence_level": str(confidence), "error_reason": str(reason),
@@ -106,7 +172,6 @@ def save_stat(q_id, correct, confidence, reason):
 
 def get_user_rank(df):
     if df.empty: return "Novice", 0
-    # Sadece giriş yapan kullanıcının istatistiklerini say
     user_df = df[df['user_id'] == st.session_state.current_user]
     count = len(user_df)
     if count < 10: return "🟢 Novice", count
@@ -123,36 +188,31 @@ def prepare_sprint_data(selected_domain):
 
 def start_sprint(mode_type, target_val, domain):
     q_df = prepare_sprint_data(domain)
-    if q_df.empty:
-        st.error("No questions found.")
-        return
+    if q_df.empty: st.error("No questions found."); return
     count = min(len(q_df), 40) if mode_type == 'Time' else min(len(q_df), target_val)
     st.session_state.smart_list = q_df.sample(n=count).reset_index(drop=True)
     st.session_state.q_idx = 0; st.session_state.start_time = time.time()
     st.session_state.is_sprint_active = True; st.session_state.view = 'Study'
-    st.session_state.mode = 'Normal'; st.session_state.sprint_type = mode_type; st.session_state.sprint_target = target_val
-    st.session_state.sprint_score = 0; st.session_state.sprint_total_attempted = 0
+    st.session_state.mode = 'Normal'; st.session_state.sprint_type = mode_type
+    st.session_state.sprint_target = target_val; st.session_state.sprint_score = 0
+    st.session_state.sprint_total_attempted = 0
     st.rerun()
 
 def start_review_sprint():
     try:
         stats_df = conn.read(worksheet="User_Stats", ttl=0)
-        # Sadece O ANKİ KULLANICININ verilerini filtrele
         stats_df = stats_df[stats_df['user_id'] == st.session_state.current_user]
-        
-        stats_df['is_correct_bool'] = stats_df['is_correct'].astype(str).str.upper().map({'TRUE': True, 'FALSE': False, '1': True, '0': False, '1.0': True, '0.0': False})
+        stats_df['is_correct_bool'] = stats_df['is_correct'].astype(str).str.upper().map({'TRUE': True, 'FALSE': False, '1': True, '0': False}).fillna(False)
         wrong_ids = stats_df[stats_df['is_correct_bool'] == False]['question_id'].unique()
         
-        if len(wrong_ids) == 0:
-            st.success("🎉 Clean sheet! No errors to review.")
-            return
+        if len(wrong_ids) == 0: st.success("🎉 No errors!"); return
 
         all_q = conn.read(worksheet="Questions", ttl=600)
         clean_wrong_ids = [str(x).split('.')[0] for x in wrong_ids]
         all_q['clean_id'] = all_q['id'].astype(str).str.split('.').str[0]
         review_list = all_q[all_q['clean_id'].isin(clean_wrong_ids)]
         
-        if review_list.empty: st.warning("Errors exist in logs but questions are missing."); return
+        if review_list.empty: st.warning("Questions missing."); return
         count = min(len(review_list), 20)
         st.session_state.smart_list = review_list.sample(n=count).reset_index(drop=True)
         st.session_state.q_idx = 0; st.session_state.start_time = time.time(); st.session_state.is_sprint_active = True; st.session_state.view = 'Study'; st.session_state.mode = 'Review'; st.session_state.sprint_type = 'Count'; st.session_state.sprint_target = count; st.session_state.sprint_score = 0; st.session_state.sprint_total_attempted = 0; st.rerun()
@@ -175,24 +235,16 @@ with st.sidebar:
     """, unsafe_allow_html=True)
     
     st.write("---")
-    if st.button("🏠 Home / Lobby"): st.session_state.is_sprint_active = False; st.session_state.view = 'Main'; st.rerun()
+    if st.button("🏠 Home"): st.session_state.is_sprint_active = False; st.session_state.view = 'Main'; st.rerun()
     if st.button("📊 Analytics"): st.session_state.is_sprint_active = False; st.session_state.view = 'Analytics'; st.rerun()
-    if st.button("🔑 Admin Panel"): st.session_state.is_sprint_active = False; st.session_state.view = 'Admin'; st.rerun()
-    # Çıkış Butonu
-    if st.button("🚪 Logout"):
-        st.session_state.is_logged_in = False
-        st.session_state.current_user = None
-        st.rerun()
+    if st.button("🚪 Logout"): st.session_state.is_logged_in = False; st.session_state.current_user = None; st.rerun()
 
 # --- VIEWS ---
-
 if st.session_state.view == 'Main':
     st.title("🛡️ CISSP Mentor Pro")
-    st.markdown(f"Welcome back, **{st.session_state.current_user}**! Ready to train?")
-    
+    st.markdown(f"Welcome, **{st.session_state.current_user}**! Select a mode.")
     domain_options = ["All Domains (Mix)"] + list(TOPIC_MAP.values())
     selected_mode = st.selectbox("🎯 Target Domain:", domain_options)
-    
     st.write("")
     c1, c2 = st.columns(2)
     with c1:
@@ -266,47 +318,31 @@ elif st.session_state.view == 'Score_Summary':
     st.markdown(f"""<div style="text-align:center; padding: 40px; background:white; border-radius:20px; box-shadow:0 4px 15px rgba(0,0,0,0.1);"><h1 style="color:#2c3e50;">🏁 Sprint Finished!</h1><div style="font-size: 60px; font-weight: 800; color:#3498db; margin: 20px 0;">{score} / {total}</div><h3 style="color:#7f8c8d;">Accuracy: {acc:.1f}%</h3></div>""", unsafe_allow_html=True)
     st.write("")
     c1, c2 = st.columns(2)
-    if c1.button("🏠 Return to Home", use_container_width=True): st.session_state.view = 'Main'; st.rerun()
-    if c2.button("📊 View Analytics", use_container_width=True): st.session_state.view = 'Analytics'; st.rerun()
+    if c1.button("🏠 Home", use_container_width=True): st.session_state.view = 'Main'; st.rerun()
+    if c2.button("📊 Analytics", use_container_width=True): st.session_state.view = 'Analytics'; st.rerun()
 
 elif st.session_state.view == 'Analytics':
     st.header("📊 Intelligence Dashboard")
     try:
         try: stats = conn.read(worksheet="User_Stats", ttl=0)
         except: stats = conn.read(worksheet="User_Stats", ttl=60)
-        
-        # Sadece O ANKİ KULLANICININ verilerini filtrele
-        if not stats.empty:
-            stats = stats[stats['user_id'] == st.session_state.current_user]
-
+        if not stats.empty: stats = stats[stats['user_id'] == st.session_state.current_user]
         questions = conn.read(worksheet="Questions", ttl=600)
-        
         if not stats.empty and not questions.empty:
             stats['qid'] = stats['question_id'].astype(str).str.split('.').str[0]
             questions['qid'] = questions['id'].astype(str).str.split('.').str[0]
             merged = pd.merge(stats, questions[['qid', 'topic_id']], on='qid')
             merged['Domain'] = merged['topic_id'].astype(str).str.split('.').str[0].map(TOPIC_MAP)
-            merged['is_correct_val'] = merged['is_correct'].astype(str).str.upper().map({'TRUE': 1, 'FALSE': 0, '1': 1, '0': 0, '1.0': 1, '0.0': 0}).fillna(0).astype(int)
-            
-            total_int = len(merged)
-            acc = (merged['is_correct_val'].sum() / total_int * 100) if total_int > 0 else 0
-            unique_q = merged['qid'].nunique()
-            cov = (unique_q / len(questions) * 100) if len(questions) > 0 else 0
-
-            k1, k2, k3 = st.columns(3)
-            k1.markdown(f'<div class="metric-card"><div class="metric-num">{total_int}</div><div class="metric-lbl">Interactions</div></div>', unsafe_allow_html=True)
-            k2.markdown(f'<div class="metric-card"><div class="metric-num">%{acc:.1f}</div><div class="metric-lbl">Accuracy</div></div>', unsafe_allow_html=True)
-            k3.markdown(f'<div class="metric-card"><div class="metric-num">{unique_q}</div><div class="metric-lbl">Unique Qs ({cov:.1f}%)</div></div>', unsafe_allow_html=True)
-            
+            merged['is_correct_val'] = merged['is_correct'].astype(str).str.upper().map({'TRUE': 1, 'FALSE': 0, '1': 1, '0': 0}).fillna(0).astype(int)
+            total_int = len(merged); acc = (merged['is_correct_val'].sum() / total_int * 100) if total_int > 0 else 0
+            k1, k2 = st.columns(2); k1.metric("Interactions", total_int); k2.metric("Accuracy", f"{acc:.1f}%")
             st.write("---")
             c1, c2 = st.columns([1,2])
             merged['Result'] = merged['is_correct_val'].apply(lambda x: 'TRUE' if x == 1 else 'FALSE')
-            with c1: st.plotly_chart(px.pie(merged, names='Result', title="Success Ratio", color_discrete_map={'TRUE':'#2ecc71','FALSE':'#e74c3c'}), use_container_width=True)
-            with c2:
-                perf = merged.groupby('Domain')['Result'].value_counts(normalize=True).unstack().fillna(0)*100
-                if 'TRUE' in perf.columns: st.subheader("Domain Mastery (%)"); st.dataframe(perf[['TRUE']].rename(columns={'TRUE':'%'}).style.format("{:.1f}").bar(color='#2ecc71'), use_container_width=True)
-        else: st.info("No data yet for this user.")
-    except Exception as e: st.error(f"Dashboard Error: {str(e)}")
+            with c1: st.plotly_chart(px.pie(merged, names='Result', color_discrete_map={'TRUE':'#2ecc71','FALSE':'#e74c3c'}), use_container_width=True)
+            with c2: perf = merged.groupby('Domain')['Result'].value_counts(normalize=True).unstack().fillna(0)*100; st.dataframe(perf)
+        else: st.info("No data yet.")
+    except Exception as e: st.error(str(e))
 
 elif st.session_state.view == 'Admin':
     if not st.session_state.admin_auth:
@@ -315,9 +351,5 @@ elif st.session_state.view == 'Admin':
         st.subheader("Data Sync")
         up = st.file_uploader("Questions (.xlsx)", type=['xlsx'])
         if up and st.button("Sync"):
-            try:
-                c = conn.read(worksheet="Questions", ttl=0)
-                n = pd.read_excel(up)
-                conn.update(worksheet="Questions", data=pd.concat([c, n], ignore_index=True))
-                st.success("Synced.")
-            except Exception as e: st.error(e)
+            c = conn.read(worksheet="Questions", ttl=0); n = pd.read_excel(up)
+            conn.update(worksheet="Questions", data=pd.concat([c, n], ignore_index=True)); st.success("Synced.")
