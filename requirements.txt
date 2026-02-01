@@ -3,3 +3,12 @@ pandas
 plotly
 fpdf2
 openpyxl
+streamlit
+pandas
+plotly
+streamlit-gsheets
+openpyxl
+fpdf
+pyotp
+qrcode
+pillow
