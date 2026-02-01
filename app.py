@@ -17,14 +17,13 @@ TOPIC_MAP = {
     "8": "Software Development Security"
 }
 
-# --- 2. CONFIGURATION & MOBILE CSS ---
+# --- 2. CONFIGURATION & PRO UI CSS ---
 st.set_page_config(page_title="CISSP AI Mentor", page_icon="🛡️", layout="wide")
 
 st.markdown("""
     <style>
-    .stApp { background-color: #f8f9fa; }
+    .stApp { background-color: #f4f6f9; }
     
-    /* BUTONLAR */
     div.stButton > button {
         width: 100%; border-radius: 12px !important; border: 1px solid #e0e0e0;
         padding: 10px !important; font-size: 18px !important; font-weight: 600 !important;
@@ -44,12 +43,10 @@ st.markdown("""
         color: white !important; border: none;
     }
 
-    /* KART TASARIMLARI */
     .q-card { background: white; padding: 30px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); border-top: 6px solid #2c3e50; margin-bottom: 25px; }
     .q-card h3 { font-size: 22px !important; line-height: 1.5 !important; color: #2d3436 !important; font-weight: 700 !important; }
     .profile-card { background: white; padding: 20px; border-radius: 15px; text-align: center; border: 1px solid #eee; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.03); }
     
-    /* LOGIN & METRİKLER */
     .login-wrapper {
         background: white; padding: 40px; border-radius: 20px;
         box-shadow: 0 10px 30px rgba(0,0,0,0.08); border: 1px solid #f0f0f0;
@@ -60,8 +57,6 @@ st.markdown("""
     .metric-card { background: white; padding: 20px; border-radius: 12px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.05); height: 100%; border-bottom: 4px solid #3498db; }
     .metric-num { font-size: 28px; font-weight: 800; color: #2c3e50; }
     .metric-lbl { font-size: 12px; text-transform: uppercase; color: #95a5a6; letter-spacing: 1px; margin-top: 5px; }
-    
-    /* TIMER & NAVIGATION */
     .timer-box { font-size: 20px; font-weight: 800; color: #e74c3c; text-align: center; background: #fff5f5; border-radius: 10px; padding: 12px; margin-bottom: 20px; border: 1px solid #feb2b2; }
     .explanation-box { background-color: #e3fcf7; padding: 20px; border-radius: 12px; border-left: 5px solid #00b894; margin-top: 20px; color: #006266; font-size: 18px !important; }
     </style>
@@ -80,23 +75,19 @@ defaults = {
 for k, v in defaults.items():
     if k not in st.session_state: st.session_state[k] = v
 
-# --- 4. AUTH HELPER FUNCTIONS ---
+# --- 4. AUTH FUNCTIONS ---
 def get_all_users():
-    try:
-        return conn.read(worksheet="Users", ttl=0)
-    except:
-        return pd.DataFrame(columns=["username", "email", "password", "is_2fa_enabled", "gdpr_consent", "role"])
+    try: return conn.read(worksheet="Users", ttl=0)
+    except: return pd.DataFrame(columns=["username", "email", "password", "is_2fa_enabled", "gdpr_consent", "role"])
 
 def clean_boolean(val):
-    s = str(val).strip().upper()
-    return True if s in ['TRUE', '1', '1.0', 'YES', 'ON'] else False
+    return str(val).strip().upper() in ['TRUE', '1', '1.0', 'YES', 'ON']
 
 def register_new_user(username, email, password, gdpr):
     users = get_all_users()
     username = username.strip()
     if not users.empty:
-        existing_users = users['username'].astype(str).str.strip().values
-        if username in existing_users: return False, "Username already exists!"
+        if username in users['username'].astype(str).str.strip().values: return False, "Username exists!"
     
     new_user = pd.DataFrame([{
         "username": username, "email": email, "password": str(password).strip(),
@@ -105,7 +96,7 @@ def register_new_user(username, email, password, gdpr):
     }])
     updated_users = pd.concat([users, new_user], ignore_index=True)
     conn.update(worksheet="Users", data=updated_users)
-    return True, "Account created successfully!"
+    return True, "Account created!"
 
 def verify_login(username, password):
     users = get_all_users()
@@ -145,6 +136,7 @@ if not st.session_state.is_logged_in:
                         st.session_state.is_logged_in = True
                         st.session_state.current_user = l_u.strip()
                         st.session_state.user_role = role
+                        st.session_state.view = 'Main' # GÜVENLİK: Girişte her zaman Main'e at
                         st.rerun()
                     else: st.error("❌ Incorrect username or password.")
 
@@ -251,6 +243,7 @@ with st.sidebar:
     if st.button("🏠 Home / Lobby"): st.session_state.is_sprint_active = False; st.session_state.view = 'Main'; st.rerun()
     if st.button("📊 Analytics"): st.session_state.is_sprint_active = False; st.session_state.view = 'Analytics'; st.rerun()
     
+    # Sadece Admin'e görünür
     if st.session_state.user_role == 'Admin':
         if st.button("🔑 Admin Panel"): 
             st.session_state.is_sprint_active = False
@@ -259,7 +252,11 @@ with st.sidebar:
     
     st.write("")
     if st.button("🚪 Logout"): 
-        st.session_state.is_logged_in = False; st.session_state.current_user = None; st.session_state.user_role = 'User'; st.rerun()
+        st.session_state.is_logged_in = False
+        st.session_state.current_user = None
+        st.session_state.user_role = 'User'
+        st.session_state.view = 'Main' # KRİTİK DÜZELTME: Görünümü sıfırla
+        st.rerun()
 
 # --- VIEWS ---
 if st.session_state.view == 'Main':
@@ -279,22 +276,14 @@ if st.session_state.view == 'Main':
         if st.button("↺ Review Errors", type="secondary"): start_review()
 
 elif st.session_state.view == 'Study' and st.session_state.smart_list is not None:
-    # --- YENİ EKLENEN ÜST BAR (Geri - Sayaç - Çıkış) ---
     c_back, c_tm, c_ex = st.columns([1, 2, 1])
-    
     with c_back:
-        # Geri butonu sadece ilk sorudan sonra görünür (index > 0)
         if st.session_state.q_idx > 0:
             if st.button("⬅️ Prev", use_container_width=True):
                 st.session_state.q_idx -= 1
-                st.session_state.feedback = None # Cevabı sıfırla ki tekrar çözebilsin
+                st.session_state.feedback = None
                 st.rerun()
-        else:
-            st.write("") # Boşluk bırak
-
-    with c_tm:
-        ph = st.empty()
-        
+    with c_tm: ph = st.empty()
     with c_ex:
         if st.button("Exit ❌", use_container_width=True): 
             st.session_state.is_sprint_active = False; st.session_state.view = 'Main'; st.rerun()
@@ -351,13 +340,7 @@ elif st.session_state.view == 'Study' and st.session_state.smart_list is not Non
 elif st.session_state.view == 'Score_Summary':
     sc = st.session_state.sprint_score; tot = st.session_state.sprint_total_attempted
     ac = (sc / tot * 100) if tot > 0 else 0
-    st.markdown(f"""
-    <div style="text-align:center; padding: 50px; background:white; border-radius:20px; box-shadow:0 10px 30px rgba(0,0,0,0.1); margin-top:20px;">
-        <h1 style="color:#2c3e50; font-size: 40px;">🏁 Sprint Finished!</h1>
-        <div style="font-size: 80px; font-weight: 800; color:#3498db; margin: 20px 0;">{sc} / {tot}</div>
-        <h3 style="color:#7f8c8d; letter-spacing:1px;">ACCURACY: {ac:.1f}%</h3>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown(f"""<div style="text-align:center; padding: 50px; background:white; border-radius:20px; box-shadow:0 10px 30px rgba(0,0,0,0.1); margin-top:20px;"><h1 style="color:#2c3e50; font-size: 40px;">🏁 Sprint Finished!</h1><div style="font-size: 80px; font-weight: 800; color:#3498db; margin: 20px 0;">{sc} / {tot}</div><h3 style="color:#7f8c8d; letter-spacing:1px;">ACCURACY: {ac:.1f}%</h3></div>""", unsafe_allow_html=True)
     st.write("")
     c1, c2 = st.columns(2)
     if c1.button("🏠 Home", use_container_width=True): st.session_state.view = 'Main'; st.rerun()
@@ -368,40 +351,34 @@ elif st.session_state.view == 'Analytics':
     try:
         try: stats = conn.read(worksheet="User_Stats", ttl=0)
         except: stats = conn.read(worksheet="User_Stats", ttl=60)
-        
         if not stats.empty: stats = stats[stats['user_id'] == st.session_state.current_user]
-        
         questions = conn.read(worksheet="Questions", ttl=600)
-        
         if not stats.empty and not questions.empty:
             stats['qid'] = stats['question_id'].astype(str).str.split('.').str[0]
             questions['qid'] = questions['id'].astype(str).str.split('.').str[0]
             merged = pd.merge(stats, questions[['qid', 'topic_id']], on='qid')
             merged['Domain'] = merged['topic_id'].astype(str).str.split('.').str[0].map(TOPIC_MAP)
-            
             merged['is_correct_val'] = merged['is_correct'].apply(clean_boolean)
-            
             total_int = len(merged); acc = (merged['is_correct_val'].sum() / total_int * 100) if total_int > 0 else 0
             unique_q = merged['qid'].nunique(); cov = (unique_q / len(questions) * 100) if len(questions) > 0 else 0
-            
             k1, k2, k3 = st.columns(3)
             k1.markdown(f'<div class="metric-card"><div class="metric-num">{total_int}</div><div class="metric-lbl">Total Interactions</div></div>', unsafe_allow_html=True)
             k2.markdown(f'<div class="metric-card"><div class="metric-num">%{acc:.1f}</div><div class="metric-lbl">Overall Accuracy</div></div>', unsafe_allow_html=True)
             k3.markdown(f'<div class="metric-card"><div class="metric-num">{unique_q}</div><div class="metric-lbl">Unique Questions ({cov:.1f}%)</div></div>', unsafe_allow_html=True)
-            
             st.write("---")
             c1, c2 = st.columns([1,2])
             merged['Result'] = merged['is_correct_val'].apply(lambda x: 'TRUE' if x == 1 else 'FALSE')
             with c1: st.plotly_chart(px.pie(merged, names='Result', title="Success Ratio", color_discrete_map={'TRUE':'#2ecc71','FALSE':'#e74c3c'}), use_container_width=True)
-            with c2: 
-                perf = merged.groupby('Domain')['Result'].value_counts(normalize=True).unstack().fillna(0)*100
-                if 'TRUE' in perf.columns: 
-                    st.subheader("Domain Mastery (%)")
-                    st.dataframe(perf[['TRUE']].rename(columns={'TRUE':'Success %'}).style.format("{:.1f}").bar(color='#2ecc71'), use_container_width=True)
-        else: st.info("No analytics data available yet. Start a sprint!")
+            with c2: perf = merged.groupby('Domain')['Result'].value_counts(normalize=True).unstack().fillna(0)*100; st.dataframe(perf)
+        else: st.info("No data yet.")
     except Exception as e: st.error(str(e))
 
 elif st.session_state.view == 'Admin':
+    # --- GÜVENLİK KONTROLÜ (Çakışma Önleyici) ---
+    if st.session_state.user_role != 'Admin':
+        st.session_state.view = 'Main' # Yetkisiz kullanıcıyı ana sayfaya at
+        st.rerun()
+    
     st.subheader("💾 Database Injection (Admin Only)")
     up = st.file_uploader("Upload Question Data (.xlsx)", type=['xlsx'])
     if up and st.button("Execute Sync"):
