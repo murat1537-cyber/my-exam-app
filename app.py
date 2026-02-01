@@ -22,7 +22,6 @@ st.set_page_config(page_title="CISSP AI Mentor", page_icon="🛡️", layout="wi
 
 st.markdown("""
     <style>
-    /* GENEL ARKA PLAN */
     .stApp { background-color: #f4f6f9; }
     
     /* BUTONLAR */
@@ -35,7 +34,6 @@ st.markdown("""
     }
     div.stButton > button:hover { border-color: #3498db; color: #3498db; transform: translateY(-2px); }
     
-    /* PRIMARY & SECONDARY BUTONLAR */
     div.stButton > button[kind="primary"] {
         background: linear-gradient(135deg, #FF6B6B 0%, #EE5253 100%);
         color: white !important; border: none; font-size: 20px !important;
@@ -51,7 +49,7 @@ st.markdown("""
     .q-card h3 { font-size: 22px !important; line-height: 1.5 !important; color: #2d3436 !important; font-weight: 700 !important; }
     .profile-card { background: white; padding: 20px; border-radius: 15px; text-align: center; border: 1px solid #eee; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.03); }
     
-    /* LOGIN EKRANI */
+    /* LOGIN & METRİKLER */
     .login-wrapper {
         background: white; padding: 40px; border-radius: 20px;
         box-shadow: 0 10px 30px rgba(0,0,0,0.08); border: 1px solid #f0f0f0;
@@ -59,12 +57,9 @@ st.markdown("""
     }
     .login-title { font-size: 28px; font-weight: 800; color: #2c3e50; margin-bottom: 10px; }
     .login-subtitle { font-size: 14px; color: #7f8c8d; margin-bottom: 30px; }
-    
-    /* METRİKLER */
     .metric-card { background: white; padding: 20px; border-radius: 12px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.05); height: 100%; border-bottom: 4px solid #3498db; }
     .metric-num { font-size: 28px; font-weight: 800; color: #2c3e50; }
     .metric-lbl { font-size: 12px; text-transform: uppercase; color: #95a5a6; letter-spacing: 1px; margin-top: 5px; }
-    
     .timer-box { font-size: 24px; font-weight: 800; color: #e74c3c; text-align: center; background: #fff5f5; border-radius: 10px; padding: 15px; margin-bottom: 20px; border: 1px solid #feb2b2; }
     .explanation-box { background-color: #e3fcf7; padding: 20px; border-radius: 12px; border-left: 5px solid #00b894; margin-top: 20px; color: #006266; font-size: 18px !important; }
     </style>
@@ -74,7 +69,7 @@ st.markdown("""
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 defaults = {
-    'is_logged_in': False, 'current_user': None,
+    'is_logged_in': False, 'current_user': None, 'user_role': 'User', # Role eklendi
     'q_idx': 0, 'view': 'Main', 'feedback': None, 'smart_list': None,
     'start_time': None, 'admin_auth': False, 'is_sprint_active': False,
     'mode': 'Normal', 'sprint_type': 'Time', 'sprint_target': 600,
@@ -83,133 +78,97 @@ defaults = {
 for k, v in defaults.items():
     if k not in st.session_state: st.session_state[k] = v
 
-# --- 4. AUTH HELPER FUNCTIONS (GÜÇLENDİRİLMİŞ) ---
+# --- 4. AUTH HELPER FUNCTIONS (ADMIN DESTEKLİ) ---
 def get_all_users():
     try:
-        # Cache'i kapatıyoruz ki yeni kayıtlar anında görünsün
         return conn.read(worksheet="Users", ttl=0)
     except:
-        return pd.DataFrame(columns=["username", "email", "password", "is_2fa_enabled", "gdpr_consent"])
+        return pd.DataFrame(columns=["username", "email", "password", "is_2fa_enabled", "gdpr_consent", "role"])
 
 def clean_boolean(val):
-    """Excel verisini güvenli boolean'a çevirir"""
     s = str(val).strip().upper()
     return True if s in ['TRUE', '1', '1.0', 'YES', 'ON'] else False
 
 def register_new_user(username, email, password, gdpr):
     users = get_all_users()
-    
-    # Kullanıcı adı kontrolü (Boşlukları temizleyerek)
     username = username.strip()
     if not users.empty:
-        # Mevcut kullanıcı adlarını string yap ve temizle
         existing_users = users['username'].astype(str).str.strip().values
-        if username in existing_users:
-            return False, "Username already exists!"
+        if username in existing_users: return False, "Username already exists!"
     
-    # Yeni kayıt
+    # Yeni kullanıcı varsayılan olarak 'User' rolünde açılır
     new_user = pd.DataFrame([{
-        "username": username,
-        "email": email,
-        "password": str(password).strip(), # Şifreyi string olarak kaydet
-        "is_2fa_enabled": "FALSE",
-        "gdpr_consent": "TRUE" if gdpr else "FALSE"
+        "username": username, "email": email, "password": str(password).strip(),
+        "is_2fa_enabled": "FALSE", "gdpr_consent": "TRUE" if gdpr else "FALSE",
+        "role": "User" # Yeni Rol Sütunu
     }])
     updated_users = pd.concat([users, new_user], ignore_index=True)
     conn.update(worksheet="Users", data=updated_users)
-    return True, "Account created successfully! Go to Login tab."
+    return True, "Account created successfully!"
 
 def verify_login(username, password):
     users = get_all_users()
-    if users.empty:
-        return False
+    if users.empty: return False, None
     
-    # 1. Girdileri Temizle
     input_user = str(username).strip()
     input_pass = str(password).strip()
-    
-    # 2. Veritabanındaki kullanıcı adlarını temizle
     users['username_clean'] = users['username'].astype(str).str.strip()
-    
-    # 3. Kullanıcıyı ara
     user_record = users[users['username_clean'] == input_user]
     
     if not user_record.empty:
-        # 4. Şifreyi al ve temizle (1234.0 sorununu çözer)
         stored_pass = str(user_record.iloc[0]['password']).strip()
+        if stored_pass.endswith('.0'): stored_pass = stored_pass[:-2]
         
-        # Eğer şifre '1234.0' gibiyse '.0' kısmını at
-        if stored_pass.endswith('.0'):
-            stored_pass = stored_pass[:-2]
-            
         if stored_pass == input_pass:
-            return True
+            # Rolü al (Eğer sütun yoksa veya boşsa 'User' varsay)
+            role = user_record.iloc[0].get('role', 'User')
+            if pd.isna(role) or str(role).strip() == '': role = 'User'
+            return True, str(role).strip()
             
-    return False
+    return False, None
 
-# --- 5. LOGIN FLOW (YENİ TASARIM) ---
+# --- 5. LOGIN FLOW ---
 if not st.session_state.is_logged_in:
     c1, c2, c3 = st.columns([1, 1.5, 1])
-    
     with c2:
-        st.markdown("""
-        <div class="login-wrapper">
-            <div style="font-size: 50px;">🛡️</div>
-            <div class="login-title">CISSP Mentor Pro</div>
-            <div class="login-subtitle">Your AI-Powered Certification Partner</div>
-        </div>
-        """, unsafe_allow_html=True)
-        
+        st.markdown("""<div class="login-wrapper"><div style="font-size: 50px;">🛡️</div><div class="login-title">CISSP Mentor Pro</div><div class="login-subtitle">Your AI-Powered Certification Partner</div></div>""", unsafe_allow_html=True)
         tab_login, tab_signup = st.tabs(["🔑 LOGIN", "📝 SIGN UP"])
         
-        # LOGIN TAB
         with tab_login:
             st.write("")
             with st.form("login_form"):
                 st.markdown("##### Welcome Back")
-                l_u = st.text_input("Username", placeholder="Enter username (e.g. Batu)")
+                l_u = st.text_input("Username", placeholder="Enter username")
                 l_p = st.text_input("Password", type="password", placeholder="Enter password")
-                
-                submitted = st.form_submit_button("🚀 Login Dashboard", type="primary", use_container_width=True)
-                
-                if submitted:
-                    if verify_login(l_u, l_p):
+                if st.form_submit_button("🚀 Login Dashboard", type="primary", use_container_width=True):
+                    success, role = verify_login(l_u, l_p)
+                    if success:
                         st.session_state.is_logged_in = True
                         st.session_state.current_user = l_u.strip()
+                        st.session_state.user_role = role # Rolü kaydet
                         st.rerun()
-                    else:
-                        st.error("❌ Incorrect username or password.")
-                        st.info("Tip: If you haven't created an account yet, please use the 'Sign Up' tab.")
+                    else: st.error("❌ Incorrect username or password.")
 
-        # SIGNUP TAB
         with tab_signup:
             st.write("")
             with st.form("signup_form"):
                 st.markdown("##### Create New Account")
-                s_u = st.text_input("Username", placeholder="Choose a username")
+                s_u = st.text_input("Username", placeholder="Choose username")
                 s_e = st.text_input("Email", placeholder="name@example.com")
-                s_p = st.text_input("Password", type="password", placeholder="Create a password")
-                s_g = st.checkbox("I agree to data processing for analytics.")
-                
-                reg_submitted = st.form_submit_button("✨ Create Account", type="secondary", use_container_width=True)
-                
-                if reg_submitted:
+                s_p = st.text_input("Password", type="password", placeholder="Create password")
+                s_g = st.checkbox("I agree to data processing (GDPR).")
+                if st.form_submit_button("✨ Create Account", type="secondary", use_container_width=True):
                     if s_u and s_p and s_e and s_g:
-                        success, msg = register_new_user(s_u, s_e, s_p, s_g)
-                        if success:
-                            st.success(f"✅ {msg}")
-                        else:
-                            st.error(f"⚠️ {msg}")
-                    else:
-                        st.warning("Please fill all fields.")
-
+                        suc, msg = register_new_user(s_u, s_e, s_p, s_g)
+                        if suc: st.success(f"✅ {msg}"); time.sleep(2); st.rerun()
+                        else: st.error(f"⚠️ {msg}")
+                    else: st.warning("Please fill all fields.")
     st.stop()
 
 # ==========================================
-# ANA UYGULAMA (Giriş Başarılıysa Burası Çalışır)
+# ANA UYGULAMA
 # ==========================================
 
-# --- CORE FUNCTIONS ---
 def save_stat(q_id, correct, confidence, reason):
     try:
         existing_df = conn.read(worksheet="User_Stats", ttl=0)
@@ -255,19 +214,15 @@ def start_review():
     try:
         stats = conn.read(worksheet="User_Stats", ttl=0)
         if stats.empty: st.success("No errors found!"); return
-        
         stats = stats[stats['user_id'] == st.session_state.current_user]
         stats['is_correct_val'] = stats['is_correct'].apply(clean_boolean)
         wrong_ids = stats[stats['is_correct_val'] == 0]['question_id'].unique()
-        
         if len(wrong_ids) == 0: st.success("🎉 No errors recorded! Great job."); return
-        
         all_q = conn.read(worksheet="Questions", ttl=600)
         clean_ids = [str(x).split('.')[0] for x in wrong_ids]
         all_q['clean_id'] = all_q['id'].astype(str).str.split('.').str[0]
         r_list = all_q[all_q['clean_id'].isin(clean_ids)]
-        
-        if r_list.empty: st.warning("Questions missing from database."); return
+        if r_list.empty: st.warning("Questions missing."); return
         c = min(len(r_list), 20)
         st.session_state.smart_list = r_list.sample(n=c).reset_index(drop=True)
         st.session_state.q_idx = 0; st.session_state.start_time = time.time(); st.session_state.is_sprint_active = True; st.session_state.view = 'Study'; st.session_state.mode = 'Review'; st.session_state.sprint_type = 'Count'; st.session_state.sprint_target = c; st.session_state.sprint_score = 0; st.session_state.sprint_total_attempted = 0; st.rerun()
@@ -280,11 +235,15 @@ with st.sidebar:
         rank, total_q = get_user_rank(stats_p)
     except: rank, total_q = "Novice", 0
     
+    # ROL rozeti göster (Admin ise)
+    role_badge = "👑 ADMIN" if st.session_state.user_role == 'Admin' else "USER"
+    
     st.markdown(f"""
     <div class="profile-card">
         <div style="font-size: 36px; margin-bottom:10px;">🛡️</div>
         <div style="font-weight:800; font-size:20px; color:#2c3e50;">{st.session_state.current_user}</div>
-        <div style="font-size:13px; color:#7f8c8d; text-transform:uppercase; margin-top:5px; letter-spacing:1px;">{rank}</div>
+        <div style="font-size:11px; color:white; background:#2c3e50; padding:2px 8px; border-radius:10px; display:inline-block; margin-bottom:5px;">{role_badge}</div>
+        <div style="font-size:13px; color:#7f8c8d; text-transform:uppercase; margin-top:5px;">{rank}</div>
         <div style="background:#eec5a9; color:#d35400; padding:5px 10px; border-radius:15px; font-weight:bold; font-size:12px; display:inline-block; margin-top:10px;">Solved: {total_q}</div>
     </div>
     """, unsafe_allow_html=True)
@@ -294,24 +253,28 @@ with st.sidebar:
     if st.button("🏠 Home / Lobby"): st.session_state.is_sprint_active = False; st.session_state.view = 'Main'; st.rerun()
     if st.button("📊 Analytics"): st.session_state.is_sprint_active = False; st.session_state.view = 'Analytics'; st.rerun()
     
+    # SADECE ADMIN İSE GÖSTERİLEN BUTON
+    if st.session_state.user_role == 'Admin':
+        if st.button("🔑 Admin Panel"): 
+            st.session_state.is_sprint_active = False
+            st.session_state.view = 'Admin'
+            st.rerun()
+    
     st.write("")
     if st.button("🚪 Logout"): 
-        st.session_state.is_logged_in = False; st.session_state.current_user = None; st.rerun()
+        st.session_state.is_logged_in = False; st.session_state.current_user = None; st.session_state.user_role = 'User'; st.rerun()
 
 # --- VIEWS ---
 if st.session_state.view == 'Main':
     st.title("🛡️ CISSP Mentor Pro")
     st.markdown(f"**Welcome back, {st.session_state.current_user}!** Let's crush some domains today.")
-    
     dom = st.selectbox("🎯 Target Domain:", ["All Domains (Mix)"] + list(TOPIC_MAP.values()))
     st.write("")
-    
     c1, c2 = st.columns(2)
     with c1: 
         if st.button("⏱️ 10 Min Sprint", type="primary"): start_sprint('Time', 600, dom)
     with c2: 
         if st.button("⚡ 5 Min Blitz", type="primary"): start_sprint('Time', 300, dom)
-    
     c3, c4 = st.columns(2)
     with c3: 
         if st.button("📝 10 Questions", type="primary"): start_sprint('Count', 10, dom)
@@ -340,14 +303,12 @@ elif st.session_state.view == 'Study' and st.session_state.smart_list is not Non
         curr = st.session_state.smart_list.iloc[st.session_state.q_idx]
         tn = TOPIC_MAP.get(str(curr['topic_id']).split('.')[0], 'General')
         bdg = "🔴 REVIEW MODE" if st.session_state.mode == 'Review' else f"📍 {tn.upper()}"
-        
         st.markdown(f"""
         <div class="q-card">
             <div style="color:#7f8c8d; font-size:13px; margin-bottom:12px; font-weight:bold; letter-spacing:0.5px;">{bdg}</div>
             <h3>{curr["content_text"]}</h3>
         </div>
         """, unsafe_allow_html=True)
-        
         c1, c2 = st.columns(2)
         opts = [('A', 'option_a'), ('B', 'option_b'), ('C', 'option_c'), ('D', 'option_d')]
         for i, (cd, cl) in enumerate(opts):
@@ -406,7 +367,6 @@ elif st.session_state.view == 'Analytics':
             merged = pd.merge(stats, questions[['qid', 'topic_id']], on='qid')
             merged['Domain'] = merged['topic_id'].astype(str).str.split('.').str[0].map(TOPIC_MAP)
             
-            # Veri temizliği (clean_boolean)
             merged['is_correct_val'] = merged['is_correct'].apply(clean_boolean)
             
             total_int = len(merged); acc = (merged['is_correct_val'].sum() / total_int * 100) if total_int > 0 else 0
@@ -430,13 +390,13 @@ elif st.session_state.view == 'Analytics':
     except Exception as e: st.error(str(e))
 
 elif st.session_state.view == 'Admin':
-    if not st.session_state.admin_auth:
-        if st.text_input("Admin Code", type="password") == "1234": st.session_state.admin_auth = True; st.rerun()
-    else:
-        st.subheader("Data Sync")
-        up = st.file_uploader("Questions (.xlsx)", type=['xlsx'])
-        if up and st.button("Sync"):
-            try:
-                c = conn.read(worksheet="Questions", ttl=0); n = pd.read_excel(up)
-                conn.update(worksheet="Questions", data=pd.concat([c, n], ignore_index=True)); st.success("Synced.")
-            except Exception as e: st.error(e)
+    # Şifre sormuyoruz, çünkü ROL KONTROLÜ yukarıda yapıldı.
+    st.subheader("💾 Database Injection (Admin Only)")
+    up = st.file_uploader("Upload Question Data (.xlsx)", type=['xlsx'])
+    if up and st.button("Execute Sync"):
+        try:
+            c = conn.read(worksheet="Questions", ttl=0)
+            n = pd.read_excel(up)
+            conn.update(worksheet="Questions", data=pd.concat([c, n], ignore_index=True))
+            st.success("Data injection successful.")
+        except Exception as e: st.error(f"Injection Failed: {e}")
