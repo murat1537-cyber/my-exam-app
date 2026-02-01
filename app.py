@@ -4,6 +4,11 @@ import pandas as pd
 import plotly.express as px
 from datetime import datetime
 import time
+import hashlib
+import secrets
+import pyotp
+import qrcode
+import io
 
 # --- 1. CISSP DOMAIN MAPPING ---
 TOPIC_MAP = {
@@ -22,84 +27,38 @@ st.set_page_config(page_title="CISSP AI Mentor", page_icon="🛡️", layout="wi
 
 st.markdown("""
     <style>
-    /* GENEL ARKA PLAN */
     .stApp { background-color: #f4f6f9; }
     
-    /* --- 1. SORU ŞIKLARI (VARSAYILAN BUTONLAR) --- */
-    /* Burası A, B, C, D şıklarını "Beyaz Kart" gibi yapar */
     div.stButton > button {
-        width: 100%; 
-        border-radius: 12px !important; 
-        border: 2px solid #d1d8e0 !important; /* Belirgin gri çerçeve */
-        padding: 15px 20px !important; 
-        font-size: 20px !important; /* BÜYÜK OKUNAKLI FONT */
-        font-weight: 600 !important;
-        background-color: #ffffff !important; /* BEMBEYAZ ZEMİN */
-        color: #000000 !important; /* TAM SİYAH YAZI */
-        min-height: 85px; 
-        white-space: normal !important; /* Uzun yazılar alt satıra geçsin */
-        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-        text-align: left !important; /* ŞIKLARI SOLA YASLA */
-        transition: all 0.2s ease;
-        line-height: 1.5 !important;
+        width: 100%; border-radius: 12px !important; border: 2px solid #d1d8e0 !important;
+        padding: 15px 20px !important; font-size: 20px !important; font-weight: 600 !important;
+        background-color: #ffffff !important; color: #000000 !important;
+        min-height: 85px; white-space: normal !important; box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        text-align: left !important; line-height: 1.5 !important; transition: all 0.2s ease;
     }
-    
-    /* Şıkların üzerine gelince (Hover) */
     div.stButton > button:hover { 
-        border-color: #3498db !important; 
-        background-color: #f0f8ff !important; /* Çok açık mavi */
-        color: #000000 !important; 
-        transform: translateY(-2px);
+        border-color: #3498db !important; background-color: #f0f8ff !important; 
+        color: #000000 !important; transform: translateY(-2px);
     }
     
-    /* --- 2. AKSİYON BUTONLARI (Primary - Login, Next vb.) --- */
-    /* Bunlar renkli ve ortalı kalsın ki şıklardan ayrılsın */
     div.stButton > button[kind="primary"] {
         background: linear-gradient(135deg, #FF6B6B 0%, #EE5253 100%) !important;
-        color: white !important; 
-        border: none !important;
-        text-align: center !important; 
+        color: white !important; border: none !important; text-align: center !important; 
         font-weight: 700 !important;
     }
-    
-    /* --- 3. NAVİGASYON BUTONLARI (Secondary - Prev, Exit, Logout) --- */
     div.stButton > button[kind="secondary"] {
-        background-color: #dfe6e9 !important;
-        color: #2d3436 !important;
-        border: 1px solid #b2bec3 !important;
-        text-align: center !important;
-        font-size: 18px !important;
+        background-color: #dfe6e9 !important; color: #2d3436 !important;
+        border: 1px solid #b2bec3 !important; text-align: center !important; font-size: 18px !important;
     }
 
-    /* KART VE METİN DÜZENLEMELERİ */
-    .q-card { 
-        background: white; 
-        padding: 35px; 
-        border-radius: 16px; 
-        box-shadow: 0 4px 20px rgba(0,0,0,0.05); 
-        border-top: 6px solid #2c3e50; 
-        margin-bottom: 25px; 
-    }
-    .q-card h3 { 
-        font-size: 24px !important; 
-        line-height: 1.5 !important; 
-        color: #000000 !important; /* Soru başlığı da tam siyah */
-        font-weight: 700 !important; 
-    }
-    
+    .q-card { background: white; padding: 35px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); border-top: 6px solid #2c3e50; margin-bottom: 25px; }
+    .q-card h3 { font-size: 24px !important; line-height: 1.5 !important; color: #000000 !important; font-weight: 700 !important; }
     .profile-card { background: white; padding: 20px; border-radius: 15px; text-align: center; border: 1px solid #eee; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.03); }
-    
-    .login-wrapper {
-        background: white; padding: 40px; border-radius: 20px;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.08); border: 1px solid #f0f0f0;
-        text-align: center; margin-top: 50px;
-    }
+    .login-wrapper { background: white; padding: 40px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); border: 1px solid #f0f0f0; text-align: center; margin-top: 50px; }
     .login-title { font-size: 28px; font-weight: 800; color: #2c3e50; margin-bottom: 10px; }
-    
     .metric-card { background: white; padding: 20px; border-radius: 12px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.05); height: 100%; border-bottom: 4px solid #3498db; }
     .metric-num { font-size: 28px; font-weight: 800; color: #2c3e50; }
     .metric-lbl { font-size: 12px; text-transform: uppercase; color: #95a5a6; letter-spacing: 1px; margin-top: 5px; }
-    
     .timer-box { font-size: 22px; font-weight: 800; color: #e74c3c; text-align: center; background: white; border-radius: 10px; padding: 12px; margin-bottom: 20px; border: 2px solid #fab1a0; }
     .explanation-box { background-color: #e3fcf7; padding: 20px; border-radius: 12px; border-left: 5px solid #00b894; margin-top: 20px; color: #000000; font-size: 18px !important; line-height: 1.6; }
     </style>
@@ -118,7 +77,37 @@ defaults = {
 for k, v in defaults.items():
     if k not in st.session_state: st.session_state[k] = v
 
-# --- 4. AUTH HELPER FUNCTIONS ---
+# --- 4. SECURITY & AUTH FUNCTIONS (NEW) ---
+
+def hash_password(password, salt=None):
+    """Şifreyi tuzlayıp hashlere çevirir."""
+    if salt is None:
+        salt = secrets.token_hex(8) # 16 karakterlik rastgele tuz
+    # Tuz + Şifre birleşimini SHA256 ile hashle
+    hashed = hashlib.sha256((salt + password).encode('utf-8')).hexdigest()
+    # Veritabanına kaydedilecek format: tuz|hash
+    return f"{salt}|{hashed}"
+
+def check_password(stored_password, input_password):
+    """
+    Girilen şifreyi, kayıtlı hash ile karşılaştırır.
+    Eski (plaintext) şifreleri de destekler.
+    """
+    stored_password = str(stored_password).strip()
+    input_password = str(input_password).strip()
+    
+    # 1. Eğer şifre '|' içeriyorsa Hashlenmiştir
+    if '|' in stored_password:
+        salt, hashed = stored_password.split('|', 1)
+        # Girilen şifreyi aynı tuz ile hashle ve karşılaştır
+        new_hash = hashlib.sha256((salt + input_password).encode('utf-8')).hexdigest()
+        return new_hash == hashed
+    else:
+        # 2. Legacy Support (Eski düz metin şifreler için)
+        # 1234.0 gibi float sorunlarını temizle
+        if stored_password.endswith('.0'): stored_password = stored_password[:-2]
+        return stored_password == input_password
+
 def get_all_users():
     try: return conn.read(worksheet="Users", ttl=0)
     except: return pd.DataFrame(columns=["username", "email", "password", "is_2fa_enabled", "gdpr_consent", "role"])
@@ -132,32 +121,34 @@ def register_new_user(username, email, password, gdpr):
     if not users.empty:
         if username in users['username'].astype(str).str.strip().values: return False, "Username exists!"
     
+    # Şifreyi Hashle
+    secure_password = hash_password(str(password).strip())
+    
     new_user = pd.DataFrame([{
-        "username": username, "email": email, "password": str(password).strip(),
+        "username": username, "email": email, "password": secure_password,
         "is_2fa_enabled": "FALSE", "gdpr_consent": "TRUE" if gdpr else "FALSE",
         "role": "User"
     }])
     updated_users = pd.concat([users, new_user], ignore_index=True)
     conn.update(worksheet="Users", data=updated_users)
-    return True, "Account created successfully!"
+    return True, "Account created! Password secured."
 
 def verify_login(username, password):
     users = get_all_users()
     if users.empty: return False, None
     
     input_user = str(username).strip()
-    input_pass = str(password).strip()
     users['username_clean'] = users['username'].astype(str).str.strip()
     user_record = users[users['username_clean'] == input_user]
     
     if not user_record.empty:
-        stored_pass = str(user_record.iloc[0]['password']).strip()
-        if stored_pass.endswith('.0'): stored_pass = stored_pass[:-2]
-        
-        if stored_pass == input_pass:
+        stored_pass = user_record.iloc[0]['password']
+        # Yeni Güvenli Kontrol Fonksiyonunu Kullan
+        if check_password(stored_pass, password):
             role = user_record.iloc[0].get('role', 'User')
             if pd.isna(role) or str(role).strip() == '': role = 'User'
             return True, str(role).strip()
+            
     return False, None
 
 # --- 5. LOGIN FLOW ---
@@ -274,10 +265,10 @@ with st.sidebar:
     st.markdown(f"""
     <div class="profile-card">
         <div style="font-size: 36px; margin-bottom:10px;">🛡️</div>
-        <div style="font-weight:800; font-size:20px; color:#2c3e50;">{st.session_state.current_user}</div>
-        <div style="font-size:11px; color:white; background:#2c3e50; padding:2px 8px; border-radius:10px; display:inline-block; margin-bottom:5px;">{role_badge}</div>
+        <div style="font-weight:800; font-size:22px; color:#2c3e50;">{st.session_state.current_user}</div>
+        <div style="font-size:11px; color:white; background:#34495e; padding:4px 10px; border-radius:12px; display:inline-block; margin-bottom:5px;">{role_badge}</div>
         <div style="font-size:13px; color:#7f8c8d; text-transform:uppercase; margin-top:5px;">{rank}</div>
-        <div style="background:#eec5a9; color:#d35400; padding:5px 10px; border-radius:15px; font-weight:bold; font-size:12px; display:inline-block; margin-top:10px;">Solved: {total_q}</div>
+        <div style="background:#eec5a9; color:#d35400; padding:5px 10px; border-radius:8px; font-weight:bold; font-size:13px; display:inline-block; margin-top:10px;">Solved: {total_q}</div>
     </div>
     """, unsafe_allow_html=True)
     
@@ -351,7 +342,6 @@ elif st.session_state.view == 'Study' and st.session_state.smart_list is not Non
         opts = [('A', 'option_a'), ('B', 'option_b'), ('C', 'option_c'), ('D', 'option_d')]
         for i, (cd, cl) in enumerate(opts):
             with (c1 if i%2==0 else c2):
-                # BURASI KRİTİK: Butonları kart gibi ve sola yaslı (text-align: left) yapıyoruz
                 if st.button(f"{cd}) {curr[cl]}", use_container_width=True):
                     st.session_state.feedback = (cd == curr['correct_option'])
                     st.session_state.last_q_id = curr['id']
