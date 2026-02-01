@@ -17,34 +17,76 @@ TOPIC_MAP = {
     "8": "Software Development Security"
 }
 
-# --- 2. CONFIGURATION & PRO UI CSS ---
+# --- 2. CONFIGURATION & HIGH CONTRAST CSS ---
 st.set_page_config(page_title="CISSP AI Mentor", page_icon="🛡️", layout="wide")
 
 st.markdown("""
     <style>
-    .stApp { background-color: #f4f6f9; }
+    /* GENEL ARKA PLAN: Göz yormayan çok açık gri */
+    .stApp { background-color: #f0f2f6; }
     
+    /* --- 1. STANDART BUTONLAR (ŞIKLAR İÇİN) --- */
+    /* Beyaz zemin, Koyu Gri Yazı, Belirgin Kenarlık */
     div.stButton > button {
-        width: 100%; border-radius: 12px !important; border: 1px solid #e0e0e0;
-        padding: 10px !important; font-size: 18px !important; font-weight: 600 !important;
-        background-color: white; color: #2c3e50; min-height: 60px;
-        white-space: normal !important; box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-        transition: all 0.2s;
+        width: 100%; 
+        border-radius: 15px !important; 
+        border: 2px solid #d1d8e0 !important;
+        padding: 15px 20px !important; 
+        font-size: 20px !important; /* Okunabilir büyük font */
+        font-weight: 600 !important;
+        background-color: white !important; 
+        color: #2c3e50 !important; /* Koyu renk yazı (Kontrast için) */
+        min-height: 80px;
+        white-space: normal !important; 
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        transition: all 0.3s ease;
+        line-height: 1.4 !important;
+        text-align: left !important; /* Şıkları sola yasla */
     }
-    div.stButton > button:hover { border-color: #3498db; color: #3498db; transform: translateY(-2px); }
     
-    div.stButton > button[kind="primary"] {
-        background: linear-gradient(135deg, #FF6B6B 0%, #EE5253 100%);
-        color: white !important; border: none; font-size: 20px !important;
-        box-shadow: 0 4px 15px rgba(238, 82, 83, 0.3);
+    /* Hover (Üzerine gelince) Efekti */
+    div.stButton > button:hover { 
+        border-color: #3498db !important; 
+        color: #2980b9 !important; 
+        background-color: #f7fbff !important;
+        transform: translateY(-2px);
+        box-shadow: 0 6px 12px rgba(0,0,0,0.1);
     }
+    
+    /* --- 2. PRIMARY BUTONLAR (LOGIN, START, NEXT) --- */
+    /* Bunlar renkli kalabilir ama yazı boyutunu büyüttük */
+    div.stButton > button[kind="primary"] {
+        background: linear-gradient(135deg, #0984e3 0%, #00cec9 100%) !important;
+        color: white !important; 
+        border: none !important;
+        text-align: center !important;
+        font-weight: 700 !important;
+    }
+    
+    /* --- 3. SECONDARY BUTONLAR (ÇIKIŞ, PREV) --- */
     div.stButton > button[kind="secondary"] {
-        background: linear-gradient(135deg, #f0932b 0%, #ffbe76 100%);
-        color: white !important; border: none;
+        background: #dfe6e9 !important;
+        color: #636e72 !important;
+        border: none !important;
+        text-align: center !important;
     }
 
-    .q-card { background: white; padding: 30px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); border-top: 6px solid #2c3e50; margin-bottom: 25px; }
-    .q-card h3 { font-size: 22px !important; line-height: 1.5 !important; color: #2d3436 !important; font-weight: 700 !important; }
+    /* --- KART VE METİN DÜZENLEMELERİ --- */
+    .q-card { 
+        background: white; 
+        padding: 35px; 
+        border-radius: 20px; 
+        box-shadow: 0 10px 25px rgba(0,0,0,0.05); 
+        border-left: 8px solid #34495e; /* Sol tarafa şık çizgi */
+        margin-bottom: 30px; 
+    }
+    .q-card h3 { 
+        font-size: 26px !important; 
+        line-height: 1.6 !important; 
+        color: #2d3436 !important; 
+        font-weight: 700 !important; 
+    }
+    
     .profile-card { background: white; padding: 20px; border-radius: 15px; text-align: center; border: 1px solid #eee; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.03); }
     
     .login-wrapper {
@@ -54,11 +96,28 @@ st.markdown("""
     }
     .login-title { font-size: 28px; font-weight: 800; color: #2c3e50; margin-bottom: 10px; }
     .login-subtitle { font-size: 14px; color: #7f8c8d; margin-bottom: 30px; }
+    
     .metric-card { background: white; padding: 20px; border-radius: 12px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.05); height: 100%; border-bottom: 4px solid #3498db; }
     .metric-num { font-size: 28px; font-weight: 800; color: #2c3e50; }
     .metric-lbl { font-size: 12px; text-transform: uppercase; color: #95a5a6; letter-spacing: 1px; margin-top: 5px; }
-    .timer-box { font-size: 20px; font-weight: 800; color: #e74c3c; text-align: center; background: #fff5f5; border-radius: 10px; padding: 12px; margin-bottom: 20px; border: 1px solid #feb2b2; }
-    .explanation-box { background-color: #e3fcf7; padding: 20px; border-radius: 12px; border-left: 5px solid #00b894; margin-top: 20px; color: #006266; font-size: 18px !important; }
+    
+    /* GÜÇLENDİRİLMİŞ GERİ BİLDİRİM KUTUSU */
+    .timer-box { font-size: 20px; font-weight: 800; color: #e74c3c; text-align: center; background: white; border-radius: 12px; padding: 12px; margin-bottom: 20px; border: 2px solid #fab1a0; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+    
+    .explanation-box { 
+        background-color: #e8f8f5; /* Çok açık yeşil */
+        padding: 25px; 
+        border-radius: 15px; 
+        border-left: 6px solid #00b894; 
+        margin-top: 25px; 
+        color: #2d3436; /* Koyu yazı */
+        font-size: 18px !important; 
+        line-height: 1.6;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.03);
+    }
+    
+    /* Cevap Doğru/Yanlış Uyarıları için stil */
+    .stAlert { font-weight: bold; font-size: 18px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -75,7 +134,7 @@ defaults = {
 for k, v in defaults.items():
     if k not in st.session_state: st.session_state[k] = v
 
-# --- 4. AUTH FUNCTIONS ---
+# --- 4. AUTH HELPER FUNCTIONS ---
 def get_all_users():
     try: return conn.read(worksheet="Users", ttl=0)
     except: return pd.DataFrame(columns=["username", "email", "password", "is_2fa_enabled", "gdpr_consent", "role"])
@@ -96,7 +155,7 @@ def register_new_user(username, email, password, gdpr):
     }])
     updated_users = pd.concat([users, new_user], ignore_index=True)
     conn.update(worksheet="Users", data=updated_users)
-    return True, "Account created!"
+    return True, "Account created successfully!"
 
 def verify_login(username, password):
     users = get_all_users()
@@ -136,7 +195,7 @@ if not st.session_state.is_logged_in:
                         st.session_state.is_logged_in = True
                         st.session_state.current_user = l_u.strip()
                         st.session_state.user_role = role
-                        st.session_state.view = 'Main' # GÜVENLİK: Girişte her zaman Main'e at
+                        st.session_state.view = 'Main' 
                         st.rerun()
                     else: st.error("❌ Incorrect username or password.")
 
@@ -243,7 +302,6 @@ with st.sidebar:
     if st.button("🏠 Home / Lobby"): st.session_state.is_sprint_active = False; st.session_state.view = 'Main'; st.rerun()
     if st.button("📊 Analytics"): st.session_state.is_sprint_active = False; st.session_state.view = 'Analytics'; st.rerun()
     
-    # Sadece Admin'e görünür
     if st.session_state.user_role == 'Admin':
         if st.button("🔑 Admin Panel"): 
             st.session_state.is_sprint_active = False
@@ -252,11 +310,7 @@ with st.sidebar:
     
     st.write("")
     if st.button("🚪 Logout"): 
-        st.session_state.is_logged_in = False
-        st.session_state.current_user = None
-        st.session_state.user_role = 'User'
-        st.session_state.view = 'Main' # KRİTİK DÜZELTME: Görünümü sıfırla
-        st.rerun()
+        st.session_state.is_logged_in = False; st.session_state.current_user = None; st.session_state.user_role = 'User'; st.session_state.view = 'Main'; st.rerun()
 
 # --- VIEWS ---
 if st.session_state.view == 'Main':
@@ -279,13 +333,13 @@ elif st.session_state.view == 'Study' and st.session_state.smart_list is not Non
     c_back, c_tm, c_ex = st.columns([1, 2, 1])
     with c_back:
         if st.session_state.q_idx > 0:
-            if st.button("⬅️ Prev", use_container_width=True):
+            if st.button("⬅️ Prev", use_container_width=True, type="secondary"):
                 st.session_state.q_idx -= 1
                 st.session_state.feedback = None
                 st.rerun()
     with c_tm: ph = st.empty()
     with c_ex:
-        if st.button("Exit ❌", use_container_width=True): 
+        if st.button("Exit ❌", use_container_width=True, type="secondary"): 
             st.session_state.is_sprint_active = False; st.session_state.view = 'Main'; st.rerun()
 
     end = False
@@ -314,6 +368,8 @@ elif st.session_state.view == 'Study' and st.session_state.smart_list is not Non
         opts = [('A', 'option_a'), ('B', 'option_b'), ('C', 'option_c'), ('D', 'option_d')]
         for i, (cd, cl) in enumerate(opts):
             with (c1 if i%2==0 else c2):
+                # Burada 'use_container_width=True' butonu tam genişlikte yapar
+                # Tasarımda 'white' background atadığımız için artık okunabilir olacak
                 if st.button(f"{cd}) {curr[cl]}", use_container_width=True):
                     st.session_state.feedback = (cd == curr['correct_option'])
                     st.session_state.last_q_id = curr['id']
@@ -324,17 +380,20 @@ elif st.session_state.view == 'Study' and st.session_state.smart_list is not Non
             st.write("---")
             if st.session_state.feedback:
                 st.success(f"✅ Correct! Answer: {curr['correct_option']}")
-                if 'explanation' in curr: st.markdown(f'<div class="explanation-box"><b>Insight:</b> {curr["explanation"]}</div>', unsafe_allow_html=True)
+                if 'explanation' in curr: st.markdown(f'<div class="explanation-box"><b>💡 Insight:</b> {curr["explanation"]}</div>', unsafe_allow_html=True)
                 sc1, sc2 = st.columns(2)
-                if sc1.button("🎯 Sure", use_container_width=True): save_stat(st.session_state.last_q_id, True, "Sure", "None"); st.session_state.q_idx+=1; st.session_state.feedback=None; st.rerun()
-                if sc2.button("🎲 Guess", use_container_width=True): save_stat(st.session_state.last_q_id, True, "Guessed", "None"); st.session_state.q_idx+=1; st.session_state.feedback=None; st.rerun()
+                # Bu butonlar aksiyon butonu olduğu için 'Primary' olarak kalsın (Renkli)
+                if sc1.button("🎯 Sure (Next)", type="primary", use_container_width=True): 
+                    save_stat(st.session_state.last_q_id, True, "Sure", "None"); st.session_state.q_idx+=1; st.session_state.feedback=None; st.rerun()
+                if sc2.button("🎲 Guess (Next)", type="primary", use_container_width=True): 
+                    save_stat(st.session_state.last_q_id, True, "Guessed", "None"); st.session_state.q_idx+=1; st.session_state.feedback=None; st.rerun()
             else:
                 st.error(f"❌ Wrong. Correct: {curr['correct_option']}")
-                if 'explanation' in curr: st.markdown(f'<div class="explanation-box"><b>Insight:</b> {curr["explanation"]}</div>', unsafe_allow_html=True)
+                if 'explanation' in curr: st.markdown(f'<div class="explanation-box"><b>💡 Insight:</b> {curr["explanation"]}</div>', unsafe_allow_html=True)
                 ec1, ec2, ec3 = st.columns(3)
-                if ec1.button("🧠 Knowledge", use_container_width=True): save_stat(st.session_state.last_q_id, False, "None", "Knowledge Gap"); st.session_state.q_idx+=1; st.session_state.feedback=None; st.rerun()
-                if ec2.button("👀 Attention", use_container_width=True): save_stat(st.session_state.last_q_id, False, "None", "Attention"); st.session_state.q_idx+=1; st.session_state.feedback=None; st.rerun()
-                if ec3.button("🤔 Logic", use_container_width=True): save_stat(st.session_state.last_q_id, False, "None", "Interpretation"); st.session_state.q_idx+=1; st.session_state.feedback=None; st.rerun()
+                if ec1.button("🧠 Knowledge", type="primary", use_container_width=True): save_stat(st.session_state.last_q_id, False, "None", "Knowledge Gap"); st.session_state.q_idx+=1; st.session_state.feedback=None; st.rerun()
+                if ec2.button("👀 Attention", type="primary", use_container_width=True): save_stat(st.session_state.last_q_id, False, "None", "Attention"); st.session_state.q_idx+=1; st.session_state.feedback=None; st.rerun()
+                if ec3.button("🤔 Logic", type="primary", use_container_width=True): save_stat(st.session_state.last_q_id, False, "None", "Interpretation"); st.session_state.q_idx+=1; st.session_state.feedback=None; st.rerun()
     else: st.session_state.is_sprint_active = False; st.session_state.view = 'Score_Summary'; st.rerun()
 
 elif st.session_state.view == 'Score_Summary':
@@ -374,17 +433,11 @@ elif st.session_state.view == 'Analytics':
     except Exception as e: st.error(str(e))
 
 elif st.session_state.view == 'Admin':
-    # --- GÜVENLİK KONTROLÜ (Çakışma Önleyici) ---
-    if st.session_state.user_role != 'Admin':
-        st.session_state.view = 'Main' # Yetkisiz kullanıcıyı ana sayfaya at
-        st.rerun()
-    
+    if st.session_state.user_role != 'Admin': st.session_state.view = 'Main'; st.rerun()
     st.subheader("💾 Database Injection (Admin Only)")
     up = st.file_uploader("Upload Question Data (.xlsx)", type=['xlsx'])
     if up and st.button("Execute Sync"):
         try:
-            c = conn.read(worksheet="Questions", ttl=0)
-            n = pd.read_excel(up)
-            conn.update(worksheet="Questions", data=pd.concat([c, n], ignore_index=True))
-            st.success("Data injection successful.")
+            c = conn.read(worksheet="Questions", ttl=0); n = pd.read_excel(up)
+            conn.update(worksheet="Questions", data=pd.concat([c, n], ignore_index=True)); st.success("Data injection successful.")
         except Exception as e: st.error(f"Injection Failed: {e}")
