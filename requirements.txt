@@ -1,8 +1,0 @@
-streamlit
-streamlit-gsheets
-pandas
-plotly
-openpyxl
-pyotp
-qrcode
-pillow
