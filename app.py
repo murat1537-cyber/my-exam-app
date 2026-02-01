@@ -17,12 +17,12 @@ TOPIC_MAP = {
     "8": "Software Development Security"
 }
 
-# --- 2. CONFIGURATION & PRO UI CSS ---
+# --- 2. CONFIGURATION & MOBILE CSS ---
 st.set_page_config(page_title="CISSP AI Mentor", page_icon="🛡️", layout="wide")
 
 st.markdown("""
     <style>
-    .stApp { background-color: #f4f6f9; }
+    .stApp { background-color: #f8f9fa; }
     
     /* BUTONLAR */
     div.stButton > button {
@@ -60,7 +60,9 @@ st.markdown("""
     .metric-card { background: white; padding: 20px; border-radius: 12px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.05); height: 100%; border-bottom: 4px solid #3498db; }
     .metric-num { font-size: 28px; font-weight: 800; color: #2c3e50; }
     .metric-lbl { font-size: 12px; text-transform: uppercase; color: #95a5a6; letter-spacing: 1px; margin-top: 5px; }
-    .timer-box { font-size: 24px; font-weight: 800; color: #e74c3c; text-align: center; background: #fff5f5; border-radius: 10px; padding: 15px; margin-bottom: 20px; border: 1px solid #feb2b2; }
+    
+    /* TIMER & NAVIGATION */
+    .timer-box { font-size: 20px; font-weight: 800; color: #e74c3c; text-align: center; background: #fff5f5; border-radius: 10px; padding: 12px; margin-bottom: 20px; border: 1px solid #feb2b2; }
     .explanation-box { background-color: #e3fcf7; padding: 20px; border-radius: 12px; border-left: 5px solid #00b894; margin-top: 20px; color: #006266; font-size: 18px !important; }
     </style>
     """, unsafe_allow_html=True)
@@ -69,7 +71,7 @@ st.markdown("""
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 defaults = {
-    'is_logged_in': False, 'current_user': None, 'user_role': 'User', # Role eklendi
+    'is_logged_in': False, 'current_user': None, 'user_role': 'User',
     'q_idx': 0, 'view': 'Main', 'feedback': None, 'smart_list': None,
     'start_time': None, 'admin_auth': False, 'is_sprint_active': False,
     'mode': 'Normal', 'sprint_type': 'Time', 'sprint_target': 600,
@@ -78,7 +80,7 @@ defaults = {
 for k, v in defaults.items():
     if k not in st.session_state: st.session_state[k] = v
 
-# --- 4. AUTH HELPER FUNCTIONS (ADMIN DESTEKLİ) ---
+# --- 4. AUTH HELPER FUNCTIONS ---
 def get_all_users():
     try:
         return conn.read(worksheet="Users", ttl=0)
@@ -96,11 +98,10 @@ def register_new_user(username, email, password, gdpr):
         existing_users = users['username'].astype(str).str.strip().values
         if username in existing_users: return False, "Username already exists!"
     
-    # Yeni kullanıcı varsayılan olarak 'User' rolünde açılır
     new_user = pd.DataFrame([{
         "username": username, "email": email, "password": str(password).strip(),
         "is_2fa_enabled": "FALSE", "gdpr_consent": "TRUE" if gdpr else "FALSE",
-        "role": "User" # Yeni Rol Sütunu
+        "role": "User"
     }])
     updated_users = pd.concat([users, new_user], ignore_index=True)
     conn.update(worksheet="Users", data=updated_users)
@@ -120,11 +121,9 @@ def verify_login(username, password):
         if stored_pass.endswith('.0'): stored_pass = stored_pass[:-2]
         
         if stored_pass == input_pass:
-            # Rolü al (Eğer sütun yoksa veya boşsa 'User' varsay)
             role = user_record.iloc[0].get('role', 'User')
             if pd.isna(role) or str(role).strip() == '': role = 'User'
             return True, str(role).strip()
-            
     return False, None
 
 # --- 5. LOGIN FLOW ---
@@ -145,7 +144,7 @@ if not st.session_state.is_logged_in:
                     if success:
                         st.session_state.is_logged_in = True
                         st.session_state.current_user = l_u.strip()
-                        st.session_state.user_role = role # Rolü kaydet
+                        st.session_state.user_role = role
                         st.rerun()
                     else: st.error("❌ Incorrect username or password.")
 
@@ -235,7 +234,6 @@ with st.sidebar:
         rank, total_q = get_user_rank(stats_p)
     except: rank, total_q = "Novice", 0
     
-    # ROL rozeti göster (Admin ise)
     role_badge = "👑 ADMIN" if st.session_state.user_role == 'Admin' else "USER"
     
     st.markdown(f"""
@@ -253,7 +251,6 @@ with st.sidebar:
     if st.button("🏠 Home / Lobby"): st.session_state.is_sprint_active = False; st.session_state.view = 'Main'; st.rerun()
     if st.button("📊 Analytics"): st.session_state.is_sprint_active = False; st.session_state.view = 'Analytics'; st.rerun()
     
-    # SADECE ADMIN İSE GÖSTERİLEN BUTON
     if st.session_state.user_role == 'Admin':
         if st.button("🔑 Admin Panel"): 
             st.session_state.is_sprint_active = False
@@ -282,10 +279,25 @@ if st.session_state.view == 'Main':
         if st.button("↺ Review Errors", type="secondary"): start_review()
 
 elif st.session_state.view == 'Study' and st.session_state.smart_list is not None:
-    c_tm, c_ex = st.columns([3, 1])
-    with c_tm: ph = st.empty()
+    # --- YENİ EKLENEN ÜST BAR (Geri - Sayaç - Çıkış) ---
+    c_back, c_tm, c_ex = st.columns([1, 2, 1])
+    
+    with c_back:
+        # Geri butonu sadece ilk sorudan sonra görünür (index > 0)
+        if st.session_state.q_idx > 0:
+            if st.button("⬅️ Prev", use_container_width=True):
+                st.session_state.q_idx -= 1
+                st.session_state.feedback = None # Cevabı sıfırla ki tekrar çözebilsin
+                st.rerun()
+        else:
+            st.write("") # Boşluk bırak
+
+    with c_tm:
+        ph = st.empty()
+        
     with c_ex:
-        if st.button("Exit"): st.session_state.is_sprint_active = False; st.session_state.view = 'Main'; st.rerun()
+        if st.button("Exit ❌", use_container_width=True): 
+            st.session_state.is_sprint_active = False; st.session_state.view = 'Main'; st.rerun()
 
     end = False
     if st.session_state.sprint_type == 'Time':
@@ -390,7 +402,6 @@ elif st.session_state.view == 'Analytics':
     except Exception as e: st.error(str(e))
 
 elif st.session_state.view == 'Admin':
-    # Şifre sormuyoruz, çünkü ROL KONTROLÜ yukarıda yapıldı.
     st.subheader("💾 Database Injection (Admin Only)")
     up = st.file_uploader("Upload Question Data (.xlsx)", type=['xlsx'])
     if up and st.button("Execute Sync"):
