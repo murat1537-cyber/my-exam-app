@@ -61,12 +61,11 @@ st.markdown("""
     .metric-label { font-size: 14px; color: #7f8c8d; text-transform: uppercase; }
     
     /* DEV START BUTONU ÖZELLEŞTİRMESİ */
-    /* Sadece type="primary" olan butonu hedefler */
     div.stButton > button[kind="primary"] {
         background: linear-gradient(45deg, #FF512F 0%, #DD2476 100%);
         color: white;
-        height: 80px; /* Daha yüksek */
-        font-size: 24px !important; /* Daha büyük yazı */
+        height: 80px; 
+        font-size: 24px !important; 
         font-weight: 800;
         border: none;
         border-radius: 12px;
@@ -79,19 +78,24 @@ st.markdown("""
         box-shadow: 0 15px 25px rgba(221, 36, 118, 0.4);
     }
     
-    /* Pulse Animasyonu */
+    /* REVIEW BUTONU ÖZELLEŞTİRMESİ (Yeni) */
+    div.stButton > button[kind="secondary"] {
+        border-radius: 12px; 
+        height: 3.5em; 
+        font-weight: 700; 
+        border: 2px dashed #f39c12;
+        color: #d35400;
+        background-color: #fdf2e9;
+    }
+    div.stButton > button[kind="secondary"]:hover {
+        background-color: #f39c12;
+        color: white;
+    }
+
     @keyframes pulse {
         0% { box-shadow: 0 0 0 0 rgba(221, 36, 118, 0.4); }
         70% { box-shadow: 0 0 0 10px rgba(221, 36, 118, 0); }
         100% { box-shadow: 0 0 0 0 rgba(221, 36, 118, 0); }
-    }
-
-    /* Diğer Standart Butonlar */
-    div.stButton > button[kind="secondary"] {
-        border-radius: 8px; 
-        height: 3.2em; 
-        font-weight: 600; 
-        border: 1px solid #dfe6e9;
     }
 
     /* Timer & Uyarılar */
@@ -110,6 +114,7 @@ if 'smart_list' not in st.session_state: st.session_state.smart_list = None
 if 'start_time' not in st.session_state: st.session_state.start_time = None
 if 'admin_auth' not in st.session_state: st.session_state.admin_auth = False
 if 'is_sprint_active' not in st.session_state: st.session_state.is_sprint_active = False
+if 'mode' not in st.session_state: st.session_state.mode = 'Normal' # Normal veya Review
 
 # --- 4. DATA FUNCTIONS ---
 def save_stat(q_id, correct, confidence, reason):
@@ -126,7 +131,6 @@ def save_stat(q_id, correct, confidence, reason):
     except: pass 
 
 def get_user_rank(df):
-    """Kullanıcının çözdüğü soru sayısına göre rütbe belirler"""
     if df.empty: return "Novice", 0
     count = len(df)
     if count < 10: return "🟢 Novice", count
@@ -153,18 +157,19 @@ with st.sidebar:
     # --------------------
 
     if st.session_state.is_sprint_active:
-        st.info("⚡ Sprint in Progress")
-        if st.button("▶️ Return to Sprint"): st.session_state.view = 'Study'; st.rerun()
-        if st.button("🛑 Terminate Sprint"): 
+        mode_label = "Error Review" if st.session_state.mode == 'Review' else "Sprint"
+        st.info(f"⚡ {mode_label} in Progress")
+        if st.button("▶️ Return to Study"): st.session_state.view = 'Study'; st.rerun()
+        if st.button("🛑 Terminate Session"): 
             st.session_state.is_sprint_active = False; st.session_state.view = 'Analytics'; st.rerun()
     else:
         st.subheader("📚 Study Configuration")
         domain_options = ["All Domains (Mix)"] + list(TOPIC_MAP.values())
         selected_mode = st.selectbox("Target Domain:", domain_options)
         
-        st.write("") # Biraz boşluk bırak
+        st.write("") 
         
-        # --- DEV START BUTONU (type='primary' ile CSS hedeflendi) ---
+        # 1. NORMAL SPRINT BUTONU
         if st.button("🚀 START SPRINT", type="primary", use_container_width=True):
             q_df = conn.read(worksheet="Questions", ttl=0)
             if selected_mode != "All Domains (Mix)":
@@ -177,7 +182,40 @@ with st.sidebar:
                 sample_n = min(len(q_df), 25)
                 st.session_state.smart_list = q_df.sample(n=sample_n).reset_index(drop=True)
                 st.session_state.q_idx = 0; st.session_state.start_time = time.time()
-                st.session_state.is_sprint_active = True; st.session_state.view = 'Study'; st.rerun()
+                st.session_state.is_sprint_active = True; st.session_state.view = 'Study'; st.session_state.mode = 'Normal'; st.rerun()
+
+        # 2. HATA TELAFİ BUTONU (YENİ)
+        st.write("")
+        if st.button("↺ REVIEW MISTAKES", type="secondary", use_container_width=True):
+            try:
+                # İstatistikleri çek
+                stats_df = conn.read(worksheet="User_Stats", ttl=0)
+                # Yanlış cevapları filtrele (FALSE)
+                stats_df['is_correct_bool'] = stats_df['is_correct'].astype(str).str.upper().replace({'0':False,'1':True,'FALSE':False,'TRUE':True,'0.0':False})
+                wrong_ids = stats_df[stats_df['is_correct_bool'] == False]['question_id'].unique()
+                
+                if len(wrong_ids) == 0:
+                    st.success("🎉 No recorded errors found! You are flawless.")
+                else:
+                    # Soruları çek
+                    all_q = conn.read(worksheet="Questions", ttl=0)
+                    # ID eşleştirme (Float/String temizliği yaparak)
+                    # Önce Wrong ID'leri temizle
+                    clean_wrong_ids = [str(x).split('.')[0] for x in wrong_ids]
+                    # Sonra Sorulardaki ID'leri temizleyip eşleşenleri bul
+                    all_q['clean_id'] = all_q['id'].astype(str).str.split('.').str[0]
+                    review_list = all_q[all_q['clean_id'].isin(clean_wrong_ids)]
+                    
+                    if review_list.empty:
+                        st.warning("Error IDs found in stats but not in Question database.")
+                    else:
+                        # Maksimum 25 soruluk bir "Hata Sınavı" oluştur
+                        sample_n = min(len(review_list), 25)
+                        st.session_state.smart_list = review_list.sample(n=sample_n).reset_index(drop=True)
+                        st.session_state.q_idx = 0; st.session_state.start_time = time.time()
+                        st.session_state.is_sprint_active = True; st.session_state.view = 'Study'; st.session_state.mode = 'Review'; st.rerun()
+            except Exception as e:
+                st.error(f"Error initializing review: {e}")
     
     st.write("---")
     if st.button("📊 Analytics Dashboard"): st.session_state.view = 'Analytics'
@@ -193,9 +231,12 @@ if st.session_state.view == 'Study' and st.session_state.smart_list is not None:
     curr = st.session_state.smart_list.iloc[st.session_state.q_idx]
     topic_name = TOPIC_MAP.get(str(curr['topic_id']).split('.')[0], 'General Domain')
     
+    # Mod bilgisini göster
+    mode_badge = "🔴 ERROR REVIEW MODE" if st.session_state.mode == 'Review' else "📍 DOMAIN: " + topic_name.upper()
+    
     st.markdown(f"""
     <div class="q-card">
-        <div style="color:#7f8c8d; font-size:14px; margin-bottom:10px;">📍 DOMAIN: {topic_name.upper()}</div>
+        <div style="color:#7f8c8d; font-size:14px; margin-bottom:10px;">{mode_badge}</div>
         <h3 style="color:#2c3e50; margin:0;">{curr["content_text"]}</h3>
     </div>
     """, unsafe_allow_html=True)
@@ -245,22 +286,18 @@ elif st.session_state.view == 'Analytics':
         questions = conn.read(worksheet="Questions", ttl=0)
         
         if not stats.empty and not questions.empty:
-            # Data Prep
             stats['qid'] = stats['question_id'].astype(str).str.split('.').str[0]
             questions['qid'] = questions['id'].astype(str).str.split('.').str[0]
             merged = pd.merge(stats, questions[['qid', 'topic_id']], on='qid')
             merged['Domain'] = merged['topic_id'].astype(str).str.split('.').str[0].map(TOPIC_MAP)
             merged['is_correct_bool'] = merged['is_correct'].astype(str).str.upper().replace({'0':False,'1':True, '0.0':False, '1.0':True, 'FALSE':False, 'TRUE':True})
             
-            # KPI Hesaplamaları
             total_solved = len(merged)
             accuracy = (merged['is_correct_bool'].sum() / total_solved * 100) if total_solved > 0 else 0
             
-            # En güçlü domain
             domain_acc = merged.groupby('Domain')['is_correct_bool'].mean()
             strongest_domain = domain_acc.idxmax() if not domain_acc.empty else "N/A"
 
-            # KPI Kartlarını Göster
             k1, k2, k3 = st.columns(3)
             k1.markdown(f'<div class="metric-container"><div class="metric-value">{total_solved}</div><div class="metric-label">Questions Solved</div></div>', unsafe_allow_html=True)
             k2.markdown(f'<div class="metric-container"><div class="metric-value">%{accuracy:.1f}</div><div class="metric-label">Global Accuracy</div></div>', unsafe_allow_html=True)
@@ -268,7 +305,6 @@ elif st.session_state.view == 'Analytics':
             
             st.write("---")
 
-            # Grafikler
             c1, c2 = st.columns([1,2])
             merged['is_correct_str'] = merged['is_correct_bool'].apply(lambda x: 'TRUE' if x else 'FALSE')
             
