@@ -20,22 +20,44 @@ TOPIC_MAP = {
     "8": "Software Development Security"
 }
 
-# --- 2. CONFIGURATION & CSS ---
+# --- 2. CONFIGURATION & MOBILE CSS ---
 st.set_page_config(page_title="CISSP AI Mentor", page_icon="🛡️", layout="wide")
 
 st.markdown("""
     <style>
     .stApp { background-color: #f8f9fa; }
-    div.stButton > button { width: 100%; border-radius: 12px !important; border: 1px solid #e0e0e0; padding: 10px !important; font-size: 20px !important; font-weight: 500 !important; background-color: white; color: #2c3e50; min-height: 70px; white-space: normal !important; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+    
+    /* BUTONLAR */
+    div.stButton > button {
+        width: 100%; border-radius: 12px !important; border: 1px solid #e0e0e0;
+        padding: 10px !important; font-size: 20px !important; font-weight: 500 !important;
+        background-color: white; color: #2c3e50; min-height: 70px;
+        white-space: normal !important; box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    }
     div.stButton > button:hover { border-color: #3498db; color: #3498db; }
-    div.stButton > button[kind="primary"] { background: linear-gradient(135deg, #FF6B6B 0%, #EE5253 100%); color: white !important; border: none; font-size: 22px !important; font-weight: 700 !important; min-height: 80px; box-shadow: 0 4px 10px rgba(238, 82, 83, 0.3); }
-    div.stButton > button[kind="secondary"] { background: linear-gradient(135deg, #f0932b 0%, #ffbe76 100%); color: white !important; border: none; font-size: 20px !important; font-weight: 700 !important; min-height: 80px; }
+    
+    div.stButton > button[kind="primary"] {
+        background: linear-gradient(135deg, #FF6B6B 0%, #EE5253 100%);
+        color: white !important; border: none; font-size: 22px !important;
+        font-weight: 700 !important; min-height: 80px;
+        box-shadow: 0 4px 10px rgba(238, 82, 83, 0.3);
+    }
+    
+    div.stButton > button[kind="secondary"] {
+        background: linear-gradient(135deg, #f0932b 0%, #ffbe76 100%);
+        color: white !important; border: none; font-size: 20px !important;
+        font-weight: 700 !important; min-height: 80px;
+    }
+
+    /* KARTLAR */
     .q-card { background: white; padding: 25px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); border-top: 6px solid #2c3e50; margin-bottom: 25px; }
     .q-card h3 { font-size: 24px !important; line-height: 1.5 !important; color: #2d3436 !important; font-weight: 700 !important; }
     .profile-card { background: white; padding: 15px; border-radius: 12px; text-align: center; border: 1px solid #eee; margin-bottom: 20px; }
     .metric-card { background: white; padding: 15px; border-radius: 12px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.05); height: 100%; border-bottom: 3px solid #74b9ff; }
     .metric-num { font-size: 28px; font-weight: 800; color: #2c3e50; }
     .metric-lbl { font-size: 14px; text-transform: uppercase; color: #636e72; margin-top: 5px; }
+    
+    /* LOGIN KUTUSU */
     .login-container { max-width: 450px; margin: 30px auto; padding: 30px; background: white; border-radius: 20px; box-shadow: 0 10px 40px rgba(0,0,0,0.1); }
     .timer-box { font-size: 22px; font-weight: 800; color: #e74c3c; text-align: center; background: #fff5f5; border-radius: 8px; padding: 10px; margin-bottom: 15px; border: 1px solid #feb2b2; }
     .explanation-box { background-color: #e3fcf7; padding: 15px; border-radius: 10px; border-left: 5px solid #00b894; margin-top: 15px; color: #006266; font-size: 18px !important; }
@@ -45,10 +67,11 @@ st.markdown("""
 # --- 3. CONNECTION & STATE ---
 conn = st.connection("gsheets", type=GSheetsConnection)
 
+# Session State Tanımları
 defaults = {
     'is_logged_in': False, 'current_user': None,
-    'login_step': 'credentials', # 'credentials' -> '2fa'
-    'temp_user_data': None,
+    'login_step': 'credentials', # 'credentials' veya '2fa'
+    'temp_user_data': None, # 2FA aşamasında kullanıcı verisini tutmak için
     'q_idx': 0, 'view': 'Main', 'feedback': None, 'smart_list': None,
     'start_time': None, 'admin_auth': False, 'is_sprint_active': False,
     'mode': 'Normal', 'sprint_type': 'Time', 'sprint_target': 600,
@@ -60,19 +83,24 @@ for k, v in defaults.items():
 
 # --- 4. AUTH & HELPER FUNCTIONS ---
 def get_all_users():
-    try: return conn.read(worksheet="Users", ttl=0)
-    except: return pd.DataFrame(columns=["username", "email", "password", "is_2fa_enabled", "gdpr_consent", "2fa_secret"])
+    try:
+        # Cache kullanmıyoruz (ttl=0) çünkü yeni kayıtları anlık görmeliyiz
+        return conn.read(worksheet="Users", ttl=0)
+    except:
+        return pd.DataFrame(columns=["username", "email", "password", "is_2fa_enabled", "gdpr_consent", "2fa_secret"])
 
 def clean_boolean(val):
+    """Excel verisini güvenli boolean'a çevirir"""
     s = str(val).strip().upper()
     return True if s in ['TRUE', '1', '1.0', 'YES', 'ON'] else False
 
 def register_new_user(username, email, password, gdpr):
     users = get_all_users()
     if not users.empty:
-        if username in users['username'].values: return False, "Username exists!"
-        if 'email' in users.columns and email in users['email'].values: return False, "Email used!"
+        if username in users['username'].values: return False, "Username already exists!"
+        if 'email' in users.columns and email in users['email'].values: return False, "Email already registered!"
     
+    # 2fa_secret sütunu ile yeni kayıt oluştur
     new_user = pd.DataFrame([{
         "username": username, "email": email, "password": password,
         "is_2fa_enabled": "FALSE", "gdpr_consent": "TRUE" if gdpr else "FALSE",
@@ -110,7 +138,7 @@ def disable_2fa_for_user(username):
         return True
     return False
 
-# --- 5. LOGIN FLOW ---
+# --- 5. LOGIN FLOW (2FA DESTEKLİ) ---
 if not st.session_state.is_logged_in:
     c1, c2, c3 = st.columns([1, 2, 1])
     with c2:
@@ -119,7 +147,8 @@ if not st.session_state.is_logged_in:
         
         with tab1:
             if st.session_state.login_step == 'credentials':
-                l_u = st.text_input("Username", key="l_u"); l_p = st.text_input("Password", type="password", key="l_p")
+                l_u = st.text_input("Username", key="l_u")
+                l_p = st.text_input("Password", type="password", key="l_p")
                 if st.button("Login", type="primary", key="btn_login"):
                     valid, u_data = verify_credentials(l_u, l_p)
                     if valid:
@@ -129,8 +158,11 @@ if not st.session_state.is_logged_in:
                             st.session_state.temp_user_data = u_data
                             st.rerun()
                         else:
-                            st.session_state.is_logged_in = True; st.session_state.current_user = l_u; st.rerun()
-                    else: st.error("Invalid credentials.")
+                            st.session_state.is_logged_in = True
+                            st.session_state.current_user = l_u
+                            st.rerun()
+                    else:
+                        st.error("Invalid credentials.")
             
             elif st.session_state.login_step == '2fa':
                 st.info("🔐 Enter 2FA Code")
@@ -158,7 +190,7 @@ if not st.session_state.is_logged_in:
     st.stop()
 
 # ==========================================
-# ANA UYGULAMA
+# ANA UYGULAMA (Giriş Başarılı)
 # ==========================================
 
 # --- CORE FUNCTIONS ---
@@ -186,6 +218,7 @@ def get_user_rank(df):
     else: return "👑 CISO Master", c
 
 def prepare_sprint_data(dom):
+    # Kota hatasını önlemek için soruları 10 dk (600sn) önbellekte tutuyoruz
     q = conn.read(worksheet="Questions", ttl=600)
     if dom != "All Domains (Mix)":
         tid = [k for k, v in TOPIC_MAP.items() if v == dom][0]
@@ -210,18 +243,16 @@ def start_review():
         stats['is_correct_val'] = stats['is_correct'].apply(clean_boolean)
         wrong_ids = stats[stats['is_correct_val'] == 0]['question_id'].unique()
         if len(wrong_ids) == 0: st.success("🎉 No errors!"); return
+        
         all_q = conn.read(worksheet="Questions", ttl=600)
         clean_ids = [str(x).split('.')[0] for x in wrong_ids]
         all_q['clean_id'] = all_q['id'].astype(str).str.split('.').str[0]
         r_list = all_q[all_q['clean_id'].isin(clean_ids)]
+        
         if r_list.empty: st.warning("Questions missing."); return
         c = min(len(r_list), 20)
         st.session_state.smart_list = r_list.sample(n=c).reset_index(drop=True)
-        st.session_state.q_idx = 0; st.session_state.start_time = time.time()
-        st.session_state.is_sprint_active = True; st.session_state.view = 'Study'
-        st.session_state.mode = 'Review'; st.session_state.sprint_type = 'Count'
-        st.session_state.sprint_target = c; st.session_state.sprint_score = 0; st.session_state.sprint_total_attempted = 0
-        st.rerun()
+        st.session_state.q_idx = 0; st.session_state.start_time = time.time(); st.session_state.is_sprint_active = True; st.session_state.view = 'Study'; st.session_state.mode = 'Review'; st.session_state.sprint_type = 'Count'; st.session_state.sprint_target = c; st.session_state.sprint_score = 0; st.session_state.sprint_total_attempted = 0; st.rerun()
     except Exception as e: st.error(f"Error: {e}")
 
 # --- SIDEBAR ---
@@ -233,6 +264,7 @@ with st.sidebar:
     
     st.markdown(f"""<div class="profile-card"><div style="font-size: 32px;">🛡️</div><div style="font-weight:bold; font-size:18px;">{st.session_state.current_user}</div><div style="font-size:12px; opacity:0.8;">{rank}</div><div style="font-size:12px; margin-top:5px;">Solved: {total_q}</div></div>""", unsafe_allow_html=True)
     st.write("---")
+    
     if st.button("🏠 Home"): st.session_state.is_sprint_active = False; st.session_state.view = 'Main'; st.session_state.show_2fa_setup = False; st.rerun()
     if st.button("📊 Analytics"): st.session_state.is_sprint_active = False; st.session_state.view = 'Analytics'; st.session_state.show_2fa_setup = False; st.rerun()
     
@@ -252,12 +284,13 @@ if st.session_state.view == 'Main':
     st.title("🛡️ CISSP Mentor Pro")
     
     # 2FA SETUP UI
-    if st.session_state.show_2fa_setup:
+    if st.session_state.get('show_2fa_setup', False):
         st.markdown("### 🔐 Two-Factor Setup")
         users_df = get_all_users()
         u_row = users_df[users_df['username'] == st.session_state.current_user].iloc[0]
+        
         if clean_boolean(u_row.get('is_2fa_enabled', 'FALSE')):
-            st.success("✅ 2FA Enabled.")
+            st.success("✅ 2FA is currently ENABLED.")
             if st.button("Disable 2FA", type="secondary"):
                 if disable_2fa_for_user(st.session_state.current_user): st.success("Disabled."); time.sleep(1); st.rerun()
         else:
@@ -277,7 +310,7 @@ if st.session_state.view == 'Main':
                     else: st.error("Invalid Code")
         st.write("---")
 
-    if not st.session_state.show_2fa_setup:
+    if not st.session_state.get('show_2fa_setup', False):
         st.markdown(f"Welcome, **{st.session_state.current_user}**!")
         dom = st.selectbox("🎯 Target Domain:", ["All Domains (Mix)"] + list(TOPIC_MAP.values()))
         st.write("")
@@ -363,7 +396,10 @@ elif st.session_state.view == 'Analytics':
             questions['qid'] = questions['id'].astype(str).str.split('.').str[0]
             merged = pd.merge(stats, questions[['qid', 'topic_id']], on='qid')
             merged['Domain'] = merged['topic_id'].astype(str).str.split('.').str[0].map(TOPIC_MAP)
+            
+            # Veri Temizliği: clean_boolean ile hataları önle
             merged['is_correct_val'] = merged['is_correct'].apply(clean_boolean)
+            
             total_int = len(merged); acc = (merged['is_correct_val'].sum() / total_int * 100) if total_int > 0 else 0
             unique_q = merged['qid'].nunique(); cov = (unique_q / len(questions) * 100) if len(questions) > 0 else 0
             k1, k2, k3 = st.columns(3)
@@ -385,5 +421,7 @@ elif st.session_state.view == 'Admin':
         st.subheader("Data Sync")
         up = st.file_uploader("Questions (.xlsx)", type=['xlsx'])
         if up and st.button("Sync"):
-            c = conn.read(worksheet="Questions", ttl=0); n = pd.read_excel(up)
-            conn.update(worksheet="Questions", data=pd.concat([c, n], ignore_index=True)); st.success("Synced.")
+            try:
+                c = conn.read(worksheet="Questions", ttl=0); n = pd.read_excel(up)
+                conn.update(worksheet="Questions", data=pd.concat([c, n], ignore_index=True)); st.success("Synced.")
+            except Exception as e: st.error(e)
