@@ -17,29 +17,74 @@ TOPIC_MAP = {
     "8": "Software Development Security"
 }
 
-# --- 2. CONFIGURATION & PRO UI STYLING ---
+# --- 2. CONFIGURATION & HIGH READABILITY STYLING ---
 st.set_page_config(page_title="CISSP AI Mentor", page_icon="🛡️", layout="wide")
 
 st.markdown("""
     <style>
     .stApp { background-color: #f4f6f9; }
-    .q-card { background: white; padding: 2.5rem; border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-left: 6px solid #2c3e50; margin-bottom: 25px; }
     
-    /* Profil ve Skor Kartları */
+    /* --- BÜYÜK FONT AYARLARI --- */
+    
+    /* 1. Soru Kartı Metni */
+    .q-card { 
+        background: white; 
+        padding: 3rem; /* Daha geniş boşluk */
+        border-radius: 15px; 
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05); 
+        border-left: 8px solid #2c3e50; 
+        margin-bottom: 30px; 
+    }
+    .q-card h3 {
+        font-size: 28px !important; /* Soru metni büyütüldü */
+        line-height: 1.6 !important;
+        font-weight: 700 !important;
+        color: #2c3e50 !important;
+    }
+    
+    /* 2. Cevap Şıkkı Butonları */
+    div.stButton > button {
+        font-size: 20px !important; /* Şık yazıları büyütüldü */
+        height: 4.5em !important; /* Buton yüksekliği artırıldı */
+        font-weight: 600 !important;
+    }
+    
+    /* 3. Özel Butonlar (Primary & Secondary) */
+    div.stButton > button[kind="primary"] { 
+        background: linear-gradient(45deg, #FF512F 0%, #DD2476 100%); 
+        color: white; 
+        border: none; 
+        border-radius: 12px;
+        font-size: 22px !important; /* Start butonları daha da büyük */
+    }
+    div.stButton > button[kind="secondary"] { 
+        border-radius: 12px; 
+        border: 2px dashed #f39c12; 
+        color: #d35400; 
+        background-color: #fdf2e9; 
+        font-size: 18px !important;
+    }
+    
+    /* Diğer Bileşenler */
     .profile-card { background: linear-gradient(135deg, #2c3e50 0%, #4ca1af 100%); padding: 20px; border-radius: 15px; color: white; text-align: center; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
-    .result-card { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 20px; color: white; text-align: center; margin: 20px 0; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
-    
+    .result-card { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px; border-radius: 20px; color: white; text-align: center; margin: 20px 0; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
     .metric-container { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); text-align: center; border-bottom: 4px solid #3498db; height: 100%; display: flex; flex-direction: column; justify-content: center; }
     .metric-value { font-size: 26px; font-weight: bold; color: #2c3e50; }
-    .metric-label { font-size: 13px; color: #7f8c8d; text-transform: uppercase; margin-top: 5px; }
     
-    /* BUTONLAR */
-    div.stButton > button[kind="primary"] { background: linear-gradient(45deg, #FF512F 0%, #DD2476 100%); color: white; border: none; border-radius: 10px; transition: all 0.3s ease; }
-    div.stButton > button[kind="secondary"] { border-radius: 10px; border: 2px dashed #f39c12; color: #d35400; background-color: #fdf2e9; }
+    .timer-box { font-size: 26px; font-weight: 800; color: #e74c3c; text-align: center; background: #fadbd8; border-radius: 10px; padding: 15px; margin-bottom: 25px; }
+    .progress-box { font-size: 24px; font-weight: 800; color: #2980b9; text-align: center; background: #d6eaf8; border-radius: 10px; padding: 15px; margin-bottom: 25px; }
     
-    .timer-box { font-size: 22px; font-weight: 800; color: #e74c3c; text-align: center; background: #fadbd8; border-radius: 8px; padding: 12px; margin-bottom: 20px; }
-    .progress-box { font-size: 20px; font-weight: 800; color: #2980b9; text-align: center; background: #d6eaf8; border-radius: 8px; padding: 12px; margin-bottom: 20px; }
-    .explanation-box { background-color: #e8f6f3; padding: 20px; border-radius: 10px; border-left: 5px solid #1abc9c; margin-top: 15px; color: #16a085; }
+    /* Açıklama Kutusu (Explanation) */
+    .explanation-box { 
+        background-color: #e8f6f3; 
+        padding: 25px; 
+        border-radius: 10px; 
+        border-left: 6px solid #1abc9c; 
+        margin-top: 20px; 
+        color: #16a085; 
+        font-size: 20px !important; /* Açıklama yazısı büyütüldü */
+        line-height: 1.6;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -50,7 +95,7 @@ defaults = {
     'q_idx': 0, 'view': 'Main', 'feedback': None, 'smart_list': None,
     'start_time': None, 'admin_auth': False, 'is_sprint_active': False,
     'mode': 'Normal', 'sprint_type': 'Time', 'sprint_target': 600,
-    'sprint_score': 0, 'sprint_total_attempted': 0 # Yeni skor değişkenleri
+    'sprint_score': 0, 'sprint_total_attempted': 0
 }
 for k, v in defaults.items():
     if k not in st.session_state: st.session_state[k] = v
@@ -58,7 +103,6 @@ for k, v in defaults.items():
 # --- 4. DATA FUNCTIONS ---
 def save_stat(q_id, correct, confidence, reason):
     try:
-        # User Stats anlık yazılmalı, cache (ttl) kullanılmaz
         existing_df = conn.read(worksheet="User_Stats", ttl=0)
         new_row = pd.DataFrame([{
             "user_id": "User_01", "question_id": str(q_id),
@@ -79,9 +123,7 @@ def get_user_rank(df):
     else: return "👑 CISO Master", count
 
 def prepare_sprint_data(selected_domain):
-    # CRITICAL FIX: ttl=600 (10 mins cache) prevents "Quota Exceeded" error
     q_df = conn.read(worksheet="Questions", ttl=600)
-    
     if selected_domain != "All Domains (Mix)":
         target_id = [k for k, v in TOPIC_MAP.items() if v == selected_domain][0]
         q_df = q_df[q_df['topic_id'].astype(str).str.split('.').str[0] == target_id]
@@ -89,9 +131,7 @@ def prepare_sprint_data(selected_domain):
 
 # --- 5. SIDEBAR ---
 with st.sidebar:
-    # --- Profil ---
     try:
-        # Cache profile stats for 1 minute
         stats_preview = conn.read(worksheet="User_Stats", ttl=60)
         rank, total_q = get_user_rank(stats_preview)
     except: rank, total_q = "Novice", 0
@@ -105,7 +145,6 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
     
-    # --- Navigasyon ---
     if st.session_state.is_sprint_active:
         msg = "⏳ Time Sprint" if st.session_state.sprint_type == 'Time' else "📝 Question Sprint"
         st.info(f"{msg} Active")
@@ -121,8 +160,6 @@ with st.sidebar:
         st.write("🚀 **Start New Sprint:**")
         
         c1, c2 = st.columns(2)
-        
-        # 10 Min Time Sprint
         if c1.button("⏱️ 10 Min", type="primary", use_container_width=True):
             q_df = prepare_sprint_data(selected_mode)
             if not q_df.empty:
@@ -135,7 +172,6 @@ with st.sidebar:
                 st.rerun()
             else: st.error("No questions.")
 
-        # 5 Min Time Sprint
         if c2.button("⚡ 5 Min", type="primary", use_container_width=True):
             q_df = prepare_sprint_data(selected_mode)
             if not q_df.empty:
@@ -148,7 +184,6 @@ with st.sidebar:
                 st.rerun()
             else: st.error("No questions.")
             
-        # 10 Question Sprint
         if st.button("📝 Ask me 10 Questions", use_container_width=True):
             q_df = prepare_sprint_data(selected_mode)
             if not q_df.empty:
@@ -162,17 +197,16 @@ with st.sidebar:
                 st.rerun()
             else: st.error("No questions.")
 
-        # Hata Telafi
         st.write("")
         if st.button("↺ Review Mistakes", type="secondary", use_container_width=True):
             try:
-                stats_df = conn.read(worksheet="User_Stats", ttl=0) # Stats needs fresh data
+                stats_df = conn.read(worksheet="User_Stats", ttl=0)
                 stats_df['is_correct_bool'] = stats_df['is_correct'].astype(str).str.upper().replace({'0':False,'1':True,'FALSE':False,'TRUE':True,'0.0':False})
                 wrong_ids = stats_df[stats_df['is_correct_bool'] == False]['question_id'].unique()
                 
                 if len(wrong_ids) == 0: st.success("No errors!")
                 else:
-                    all_q = conn.read(worksheet="Questions", ttl=600) # Cache questions
+                    all_q = conn.read(worksheet="Questions", ttl=600)
                     clean_wrong_ids = [str(x).split('.')[0] for x in wrong_ids]
                     all_q['clean_id'] = all_q['id'].astype(str).str.split('.').str[0]
                     review_list = all_q[all_q['clean_id'].isin(clean_wrong_ids)]
@@ -194,9 +228,8 @@ with st.sidebar:
 
 # --- 6. VIEWS CONTROL ---
 
-# A. SCORE SUMMARY VIEW (YENİ!)
+# A. SCORE SUMMARY VIEW
 if st.session_state.view == 'Score_Summary':
-    # Skor Hesaplama
     score = st.session_state.sprint_score
     total = st.session_state.sprint_total_attempted
     accuracy = (score / total * 100) if total > 0 else 0
@@ -204,7 +237,7 @@ if st.session_state.view == 'Score_Summary':
     st.markdown(f"""
     <div class="result-card">
         <h1>🏁 Sprint Complete!</h1>
-        <div style="font-size: 60px; font-weight: bold; margin: 20px 0;">{score} / {total}</div>
+        <div style="font-size: 80px; font-weight: bold; margin: 20px 0;">{score} / {total}</div>
         <h3>Accuracy: {accuracy:.1f}%</h3>
         <p>Great job! Every interaction makes you stronger.</p>
     </div>
@@ -218,7 +251,6 @@ if st.session_state.view == 'Score_Summary':
 
 # B. STUDY VIEW
 elif st.session_state.view == 'Study' and st.session_state.smart_list is not None:
-    # --- ÜST BİLGİ ÇUBUĞU ---
     ph = st.empty()
     should_end = False
     
@@ -235,10 +267,9 @@ elif st.session_state.view == 'Study' and st.session_state.smart_list is not Non
 
     if should_end:
         st.session_state.is_sprint_active = False
-        st.session_state.view = 'Score_Summary' # Analiz yerine Özet'e git
+        st.session_state.view = 'Score_Summary'
         st.rerun()
 
-    # --- SORU KARTI ---
     if st.session_state.q_idx < len(st.session_state.smart_list):
         curr = st.session_state.smart_list.iloc[st.session_state.q_idx]
         topic_name = TOPIC_MAP.get(str(curr['topic_id']).split('.')[0], 'General')
@@ -246,8 +277,8 @@ elif st.session_state.view == 'Study' and st.session_state.smart_list is not Non
         
         st.markdown(f"""
         <div class="q-card">
-            <div style="color:#7f8c8d; font-size:14px; margin-bottom:10px;">{mode_badge}</div>
-            <h3 style="color:#2c3e50; margin:0;">{curr["content_text"]}</h3>
+            <div style="color:#7f8c8d; font-size:16px; margin-bottom:15px; font-weight:bold;">{mode_badge}</div>
+            <h3>{curr["content_text"]}</h3>
         </div>
         """, unsafe_allow_html=True)
         
@@ -258,7 +289,6 @@ elif st.session_state.view == 'Study' and st.session_state.smart_list is not Non
                 if st.button(f"{code}) {curr[col]}", use_container_width=True):
                     st.session_state.feedback = (code == curr['correct_option'])
                     st.session_state.last_q_id = curr['id']
-                    # Skor Güncelleme
                     if st.session_state.feedback: st.session_state.sprint_score += 1
                     st.session_state.sprint_total_attempted += 1
                     st.rerun()
@@ -297,7 +327,6 @@ elif st.session_state.view == 'Study' and st.session_state.smart_list is not Non
 elif st.session_state.view == 'Analytics':
     st.header("📊 Intelligence Dashboard")
     try:
-        # Analytics reads can also be cached lightly if quota is tight
         stats = conn.read(worksheet="User_Stats", ttl=0) 
         questions = conn.read(worksheet="Questions", ttl=600)
         
@@ -308,7 +337,6 @@ elif st.session_state.view == 'Analytics':
             merged['Domain'] = merged['topic_id'].astype(str).str.split('.').str[0].map(TOPIC_MAP)
             merged['is_correct_bool'] = merged['is_correct'].astype(str).str.upper().replace({'0':False,'1':True, '0.0':False, '1.0':True, 'FALSE':False, 'TRUE':True})
             
-            # KPI
             total_int = len(merged)
             acc = (merged['is_correct_bool'].sum() / total_int * 100) if total_int > 0 else 0
             unique_q = merged['qid'].nunique()
@@ -349,7 +377,7 @@ elif st.session_state.view == 'Admin':
         up = st.file_uploader("Questions (.xlsx)", type=['xlsx'])
         if up and st.button("Sync"):
             try:
-                c = conn.read(worksheet="Questions", ttl=0) # Sync needs fresh data
+                c = conn.read(worksheet="Questions", ttl=0)
                 n = pd.read_excel(up)
                 conn.update(worksheet="Questions", data=pd.concat([c, n], ignore_index=True))
                 st.success("Synced.")
