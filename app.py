@@ -12,6 +12,7 @@ import html
 import pyotp
 import qrcode
 from io import BytesIO
+from cryptography.fernet import Fernet # ŞİFRELEME İÇİN EKLENDİ
 
 # --- 1. CISSP DOMAIN MAPPING ---
 TOPIC_MAP = {
@@ -62,8 +63,20 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. CONNECTION & STATE ---
+# --- 3. CONNECTION, STATE & ENCRYPTION SETUP ---
 conn = st.connection("gsheets", type=GSheetsConnection)
+
+# --- KRİPTOGRAFİ ANAHTARI YÖNETİMİ ---
+# NOT: Prodüksiyonda bu anahtarı st.secrets["encryption_key"] içine koymalısınız.
+# Demo'da her seferinde değişmemesi için sabit bir key kullanıyoruz.
+# Eğer anahtarı değiştirirseniz eski şifrelenmiş veriler okunamaz!
+FIXED_KEY = b'wz7X5Xy1Y9Z8a2B3c4D5e6F7g8H9i0j1k2l3m4n5o6p=' 
+try:
+    cipher_suite = Fernet(FIXED_KEY)
+except:
+    # Key hatalıysa veya yoksa geçici oluştur (Veri kaybı riski uyarısı)
+    temp_key = Fernet.generate_key()
+    cipher_suite = Fernet(temp_key)
 
 defaults = {
     'is_logged_in': False, 'current_user': None, 'user_role': 'User',
@@ -74,20 +87,61 @@ defaults = {
     'failed_login_attempts': 0,
     'last_activity_time': time.time(),
     'unsaved_stats': [],
-    # 2FA STATE
     'login_step': 'credentials', 
     'temp_user_data': None,
-    'settings_2fa_secret': None # Ayarlarda secret'ı tutmak için
+    'settings_2fa_secret': None
 }
 for k, v in defaults.items():
     if k not in st.session_state: st.session_state[k] = v
 
-# --- 4. FUNCTIONS ---
+# --- 4. SECURITY, LOGGING & ENCRYPTION FUNCTIONS ---
+
+# --- YENİ: AUDIT LOGGING ---
+def log_audit_event(event_type, username, details=""):
+    """Güvenlik olaylarını Audit_Logs sayfasına kaydeder."""
+    try:
+        # Mevcut logları oku veya boş oluştur
+        try:
+            logs_df = conn.read(worksheet="Audit_Logs", ttl=0)
+        except:
+            logs_df = pd.DataFrame(columns=["timestamp", "event_type", "username", "details"])
+        
+        new_log = pd.DataFrame([{
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "event_type": event_type,
+            "username": username,
+            "details": details
+        }])
+        
+        updated_logs = pd.concat([logs_df, new_log], ignore_index=True)
+        conn.update(worksheet="Audit_Logs", data=updated_logs)
+    except Exception as e:
+        print(f"Audit Log Error: {e}") # Loglama hatası uygulamayı durdurmamalı
+
+# --- YENİ: ŞİFRELEME YARDIMCILARI ---
+def encrypt_data(data_str):
+    """Hassas veriyi veritabanına yazmadan önce şifreler."""
+    if not data_str: return ""
+    try:
+        return cipher_suite.encrypt(data_str.encode()).decode()
+    except Exception as e:
+        return data_str # Hata olursa ham döndür (Risk yönetimi)
+
+def decrypt_data(token_str):
+    """Veritabanından okunan şifreli veriyi çözer."""
+    if not token_str: return ""
+    try:
+        return cipher_suite.decrypt(token_str.encode()).decode()
+    except:
+        # Şifre çözülemezse (belki eski düz metin veridir), olduğu gibi döndür
+        return token_str
 
 def check_session_timeout():
     if st.session_state.is_logged_in:
         if time.time() - st.session_state.last_activity_time > 900: 
+            user = st.session_state.current_user
             for key in list(st.session_state.keys()): del st.session_state[key]
+            log_audit_event("SESSION_TIMEOUT", user, "Auto logout due to inactivity")
             st.warning("Session expired. Login again.")
             st.stop()
         else: st.session_state.last_activity_time = time.time()
@@ -128,12 +182,7 @@ def get_all_users():
         return df
     except: return pd.DataFrame(columns=cols)
 
-# --- DÜZELTİLMİŞ BOOLEAN FONKSİYONU ---
 def clean_boolean(val):
-    """
-    Her türlü veriyi (Bool, Int, String) güvenli şekilde Boolean'a çevirir.
-    2FA kontrolünün bozulmamasını sağlar.
-    """
     if isinstance(val, bool): return val
     if isinstance(val, (int, float)): return val == 1
     return str(val).strip().upper() in ['TRUE', '1', '1.0', 'YES', 'ON']
@@ -146,34 +195,48 @@ def register_new_user(username, email, password, gdpr, sec_q, sec_a):
     users = get_all_users()
     if not users.empty and clean_user in users['username'].astype(str).str.strip().values: return False, "Username exists."
     
+    # GÜVENLİK: Cevabı hashle, ama TOTP secret'ı boş başlat
+    secure_password = hash_password(password.strip())
+    secure_answer = hash_password(sec_a.strip().lower()) 
+    # Not: Security Answer'ı hashliyoruz (geri dönüşü yok), TOTP Secret'ı şifreliyoruz (geri dönüşü var)
+    
     new_user = pd.DataFrame([{
-        "username": clean_user, "email": clean_email, "password": hash_password(password.strip()),
+        "username": clean_user, "email": clean_email, "password": secure_password,
         "is_2fa_enabled": "FALSE", "gdpr_consent": "TRUE" if gdpr else "FALSE", "role": "User",
-        "security_question": sec_q, "security_answer": hash_password(sec_a.strip().lower()),
-        "totp_secret": "" # Yeni kullanıcıda boş başlar
+        "security_question": sec_q, 
+        "security_answer": secure_answer, # Hashli sakla
+        "totp_secret": "" 
     }])
     conn.update(worksheet="Users", data=pd.concat([users, new_user], ignore_index=True))
+    log_audit_event("REGISTER", clean_user, "New account created")
     return True, "Created! You can enable 2FA in Settings."
 
 def verify_login_step1(username, password):
-    if st.session_state.failed_login_attempts >= 5: return False, "LOCKED", None
+    if st.session_state.failed_login_attempts >= 5: 
+        log_audit_event("LOGIN_LOCKOUT", username, "Max attempts reached")
+        return False, "LOCKED", None
+    
     users = get_all_users()
     if users.empty: return False, "INVALID", None
     
     user_rec = users[users['username'].astype(str).str.strip() == str(username).strip()]
     if not user_rec.empty:
         if check_password(user_rec.iloc[0]['password'], password):
-            # Clean boolean burada devreye giriyor
             is_2fa = clean_boolean(user_rec.iloc[0].get('is_2fa_enabled', False))
             role = user_rec.iloc[0].get('role', 'User')
+            
+            # GÜVENLİK: Secret'ı veritabanından okurken DECRYPT et
+            encrypted_secret = str(user_rec.iloc[0].get('totp_secret', ''))
+            decrypted_secret = decrypt_data(encrypted_secret)
             
             user_data = {
                 'username': str(username).strip(),
                 'role': str(role).strip() if pd.notna(role) else 'User',
-                'secret': str(user_rec.iloc[0].get('totp_secret', ''))
+                'secret': decrypted_secret # Şifresi çözülmüş secret
             }
             return True, "2FA_REQ" if is_2fa else "SUCCESS", user_data
-                
+    
+    log_audit_event("LOGIN_FAIL", username, "Invalid credentials")            
     return False, "INVALID", None
 
 def verify_totp_code(secret, code):
@@ -187,9 +250,13 @@ def enable_2fa_for_user(username, secret):
     users = get_all_users()
     idx = users.index[users['username'].astype(str).str.strip() == username].tolist()
     if idx:
-        users.at[idx[0], 'totp_secret'] = secret
+        # GÜVENLİK: Secret'ı veritabanına yazarken ENCRYPT et
+        encrypted_secret = encrypt_data(secret)
+        
+        users.at[idx[0], 'totp_secret'] = encrypted_secret
         users.at[idx[0], 'is_2fa_enabled'] = "TRUE"
         conn.update(worksheet="Users", data=users)
+        log_audit_event("2FA_ENABLE", username, "2FA activated")
         return True
     return False
 
@@ -200,6 +267,7 @@ def disable_2fa_for_user(username):
         users.at[idx[0], 'totp_secret'] = ""
         users.at[idx[0], 'is_2fa_enabled'] = "FALSE"
         conn.update(worksheet="Users", data=users)
+        log_audit_event("2FA_DISABLE", username, "2FA deactivated")
         return True
     return False
 
@@ -235,11 +303,16 @@ def reset_password_with_security_answer(username, answer, new_password):
     users = get_all_users()
     idx = users.index[users['username'].astype(str).str.strip() == username].tolist()
     if not idx: return False, "User not found."
-    if not check_password(users.at[idx[0], 'security_answer'], answer.strip().lower()): return False, "Wrong answer."
+    # Security answer HASH'li olduğu için check_password kullanırız (Decryption gerekmez)
+    if not check_password(users.at[idx[0], 'security_answer'], answer.strip().lower()): 
+        log_audit_event("RESET_FAIL", username, "Wrong security answer")
+        return False, "Wrong answer."
+    
     valid, msg = validate_password_strength(new_password)
     if not valid: return False, msg
     users.at[idx[0], 'password'] = hash_password(new_password.strip())
     conn.update(worksheet="Users", data=users)
+    log_audit_event("PASSWORD_RESET", username, "Reset via recovery")
     return True, "Reset successful."
 
 def update_user_password(username, curr_pass, new_pass):
@@ -251,6 +324,7 @@ def update_user_password(username, curr_pass, new_pass):
     if not valid: return False, msg
     users.at[idx[0], 'password'] = hash_password(new_pass.strip())
     conn.update(worksheet="Users", data=users)
+    log_audit_event("PASSWORD_CHANGE", username, "User changed password")
     return True, "Password updated."
 
 def update_user_email(username, new_email):
@@ -259,6 +333,7 @@ def update_user_email(username, new_email):
     if idx:
         users.at[idx[0], 'email'] = sanitize_input(new_email)
         conn.update(worksheet="Users", data=users)
+        log_audit_event("EMAIL_CHANGE", username, "Email updated")
         return True, "Email updated."
     return False, "User not found."
 
@@ -269,6 +344,7 @@ def update_security_settings(username, sec_q, sec_a):
         users.at[idx[0], 'security_question'] = sec_q
         users.at[idx[0], 'security_answer'] = hash_password(sec_a.strip().lower())
         conn.update(worksheet="Users", data=users)
+        log_audit_event("SEC_SETTINGS", username, "Security Q/A updated")
         return True, "Settings updated."
     return False, "Error."
 
@@ -327,7 +403,6 @@ if st.session_state.is_logged_in:
             rank, total_q = get_user_rank(stats_p)
         except: rank, total_q = "Novice", 0
         
-        # 2FA STATUS CHECK IN SIDEBAR
         users_sidebar = conn.read(worksheet="Users", ttl=600)
         user_row_sb = users_sidebar[users_sidebar['username'].astype(str).str.strip() == st.session_state.current_user]
         is_2fa_sb = False
@@ -335,7 +410,6 @@ if st.session_state.is_logged_in:
             is_2fa_sb = clean_boolean(user_row_sb.iloc[0].get('is_2fa_enabled', 'FALSE'))
         
         sec_icon = "🟢" if is_2fa_sb else "⚠️"
-        
         role_badge = "👑 ADMIN" if st.session_state.user_role == 'Admin' else "USER"
         st.markdown(f"""
         <div class="profile-card">
@@ -355,7 +429,6 @@ if st.session_state.is_logged_in:
         if st.button("📊 Analytics", use_container_width=True, type="secondary"): 
             flush_stats_to_db()
             st.session_state.is_sprint_active = False; st.session_state.view = 'Analytics'; st.rerun()
-        # SETTINGS BUTONU UYARILI
         settings_label = "⚙️ Settings (Enable 2FA)" if not is_2fa_sb else "⚙️ Settings"
         if st.button(settings_label, use_container_width=True, type="secondary"): 
             flush_stats_to_db() 
@@ -367,6 +440,7 @@ if st.session_state.is_logged_in:
         st.write("")
         if st.button("🚪 Logout", use_container_width=True, type="secondary"): 
             flush_stats_to_db()
+            log_audit_event("LOGOUT", st.session_state.current_user, "User logged out")
             for key in list(st.session_state.keys()): del st.session_state[key]
             st.rerun()
 
@@ -389,6 +463,7 @@ if st.session_state.view == 'Main':
                                 time.sleep(0.5)
                                 success, msg, data = verify_login_step1(u, p)
                                 if success and msg == "SUCCESS":
+                                    log_audit_event("LOGIN_SUCCESS", data['username'], "Login without 2FA")
                                     st.session_state.is_logged_in=True; st.session_state.current_user=data['username']; st.session_state.user_role=data['role']; st.session_state.failed_login_attempts=0; st.rerun()
                                 elif success and msg == "2FA_REQ":
                                     st.session_state.login_step = '2fa_check'; st.session_state.temp_user_data = data; st.session_state.failed_login_attempts=0; st.rerun()
@@ -401,8 +476,11 @@ if st.session_state.view == 'Main':
                             if st.form_submit_button("Verify Code", type="primary", use_container_width=True):
                                 secret = st.session_state.temp_user_data.get('secret')
                                 if verify_totp_code(secret, code):
+                                    log_audit_event("LOGIN_SUCCESS", st.session_state.temp_user_data['username'], "Login with 2FA")
                                     st.session_state.is_logged_in=True; st.session_state.current_user=st.session_state.temp_user_data['username']; st.session_state.user_role=st.session_state.temp_user_data['role']; st.session_state.login_step = 'credentials'; st.session_state.temp_user_data = None; st.rerun()
-                                else: st.error("❌ Invalid Code")
+                                else: 
+                                    log_audit_event("LOGIN_FAIL_2FA", st.session_state.temp_user_data['username'], "Invalid TOTP")
+                                    st.error("❌ Invalid Code")
                         if st.button("Cancel Login"): st.session_state.login_step = 'credentials'; st.session_state.temp_user_data = None; st.rerun()
 
             with tab2:
@@ -466,7 +544,6 @@ elif st.session_state.view == 'Settings':
                 if suc: st.success(msg)
                 else: st.error(msg)
     
-    # --- 2FA AYARLARI (GÜNCELLENDİ) ---
     with t3:
         st.markdown("### 🔐 Two-Factor Authentication")
         users = get_all_users()
@@ -482,14 +559,10 @@ elif st.session_state.view == 'Settings':
                     st.success("2FA Disabled."); time.sleep(1); st.rerun()
         else:
             st.warning("⚠️ 2FA is DISABLED. Enable it for better security.")
-            
-            # --- 1. ADIM: SECRET OLUŞTUR VE HAFIZADA TUT (Re-run'da kaybolmasın) ---
             if st.session_state.settings_2fa_secret is None:
                 st.session_state.settings_2fa_secret = pyotp.random_base32()
-            
             secret = st.session_state.settings_2fa_secret
             
-            # QR Kod Oluştur
             totp = pyotp.TOTP(secret)
             uri = totp.provisioning_uri(name=st.session_state.current_user, issuer_name="CISSP Mentor")
             qr = qrcode.make(uri)
@@ -497,22 +570,17 @@ elif st.session_state.view == 'Settings':
             qr.save(img_bytes, format='PNG')
             
             c1, c2 = st.columns([1, 2])
-            with c1:
-                st.image(img_bytes, caption="Scan with Google Auth", width=200)
+            with c1: st.image(img_bytes, caption="Scan with Google Auth", width=200)
             with c2:
                 st.write(f"**Manual Key:** `{secret}`")
-                st.write("1. Scan the QR code with Google Authenticator.")
+                st.write("1. Scan the QR code.")
                 st.write("2. Enter the 6-digit code below to confirm.")
-                
                 c_code = st.text_input("Verification Code", max_chars=6)
                 if st.button("Verify & Enable 2FA", type="primary"):
                     if verify_totp_code(secret, c_code):
                         if enable_2fa_for_user(st.session_state.current_user, secret):
-                            st.success("2FA Enabled Successfully!")
-                            st.session_state.settings_2fa_secret = None # Secret'ı temizle
-                            time.sleep(1); st.rerun()
-                    else:
-                        st.error("Invalid Code. Please try again.")
+                            st.success("2FA Enabled Successfully!"); st.session_state.settings_2fa_secret = None; time.sleep(1); st.rerun()
+                    else: st.error("Invalid Code. Please try again.")
 
 elif st.session_state.view == 'Study' and st.session_state.smart_list is not None:
     if not st.session_state.is_logged_in: st.session_state.view='Main'; st.rerun()
@@ -623,9 +691,20 @@ elif st.session_state.view == 'Analytics':
 elif st.session_state.view == 'Admin':
     if st.session_state.user_role != 'Admin': st.session_state.view = 'Main'; st.rerun()
     st.subheader("💾 Admin Sync")
-    up = st.file_uploader("Questions (.xlsx)", type=['xlsx'])
-    if up and st.button("Sync"):
+    # AUDIT LOG TAB
+    tab_sync, tab_logs = st.tabs(["Sync Questions", "Audit Logs"])
+    with tab_sync:
+        up = st.file_uploader("Questions (.xlsx)", type=['xlsx'])
+        if up and st.button("Sync"):
+            try:
+                c = conn.read(worksheet="Questions", ttl=0); n = pd.read_excel(up)
+                conn.update(worksheet="Questions", data=pd.concat([c, n], ignore_index=True)); st.success("Synced.")
+            except Exception as e: st.error(f"Error: {e}")
+    with tab_logs:
         try:
-            c = conn.read(worksheet="Questions", ttl=0); n = pd.read_excel(up)
-            conn.update(worksheet="Questions", data=pd.concat([c, n], ignore_index=True)); st.success("Synced.")
-        except Exception as e: st.error(f"Error: {e}")
+            logs = conn.read(worksheet="Audit_Logs", ttl=0)
+            if not logs.empty:
+                # Sona eklenen en üstte görünsün
+                st.dataframe(logs.sort_index(ascending=False), use_container_width=True)
+            else: st.info("No logs found.")
+        except: st.warning("Audit log sheet not found.")
