@@ -70,7 +70,7 @@ defaults = {
     'sprint_score': 0, 'sprint_total_attempted': 0,
     'failed_login_attempts': 0,
     'last_activity_time': time.time(),
-    'unsaved_stats': []  # PERFORMANS İÇİN: Geçici hafıza
+    'unsaved_stats': [] 
 }
 for k, v in defaults.items():
     if k not in st.session_state: st.session_state[k] = v
@@ -79,7 +79,7 @@ for k, v in defaults.items():
 
 def check_session_timeout():
     if st.session_state.is_logged_in:
-        if time.time() - st.session_state.last_activity_time > 900: # 15 dk
+        if time.time() - st.session_state.last_activity_time > 900: 
             for key in list(st.session_state.keys()): del st.session_state[key]
             st.warning("Session expired. Login again.")
             st.stop()
@@ -115,7 +115,7 @@ def check_password(stored_password, input_password):
 def get_all_users():
     cols = ["username", "email", "password", "is_2fa_enabled", "gdpr_consent", "role", "security_question", "security_answer"]
     try:
-        df = conn.read(worksheet="Users", ttl=0) # Login için taze veri lazım
+        df = conn.read(worksheet="Users", ttl=0)
         for col in cols: 
             if col not in df.columns: df[col] = ""
         return df
@@ -152,9 +152,7 @@ def verify_login(username, password):
             return True, str(role).strip() if pd.notna(role) else 'User'
     return False, None
 
-# --- PERFORMANS FONKSİYONLARI (YENİ) ---
-
-# 1. Veriyi RAM'e kaydet (Hızlı)
+# --- PERFORMANS FONKSİYONLARI ---
 def save_stat_local(q_id, correct, confidence, reason):
     st.session_state.unsaved_stats.append({
         "user_id": st.session_state.current_user,
@@ -164,7 +162,6 @@ def save_stat_local(q_id, correct, confidence, reason):
         "attempt_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     })
 
-# 2. Veriyi Google Sheets'e toplu gönder (Yavaş ama tek seferlik)
 def flush_stats_to_db():
     if not st.session_state.unsaved_stats: return
     try:
@@ -173,7 +170,7 @@ def flush_stats_to_db():
             new_df = pd.DataFrame(st.session_state.unsaved_stats)
             final_df = pd.concat([existing, new_df], ignore_index=True).dropna(how='all')
             conn.update(worksheet="User_Stats", data=final_df)
-            st.session_state.unsaved_stats = [] # Temizle
+            st.session_state.unsaved_stats = [] 
     except Exception as e: st.error(f"Save failed: {e}")
 
 # --- DİĞER YARDIMCILAR ---
@@ -235,7 +232,6 @@ def get_user_rank(df):
     return "👑 CISO Master", c
 
 def prepare_sprint_data(dom):
-    # PERFORMANS: Soruları 1 saat önbellekte tut (ttl=3600)
     q = conn.read(worksheet="Questions", ttl=3600)
     if dom != "All Domains (Mix)":
         tid = [k for k, v in TOPIC_MAP.items() if v == dom][0]
@@ -255,7 +251,6 @@ def start_sprint(m_type, val, dom):
 
 def start_review():
     try:
-        # User Stats anlık lazım değil, 10 dk cache yeter (ttl=600)
         stats = conn.read(worksheet="User_Stats", ttl=600)
         if stats.empty: st.success("No errors!"); return
         stats = stats[stats['user_id'] == st.session_state.current_user]
@@ -275,20 +270,18 @@ def start_review():
 # --- SIDEBAR ---
 with st.sidebar:
     try:
-        # Profil istatistikleri için de cache kullan (ttl=600)
         stats_p = conn.read(worksheet="User_Stats", ttl=600)
         rank, total_q = get_user_rank(stats_p)
     except: rank, total_q = "Novice", 0
-    
     role_badge = "👑 ADMIN" if st.session_state.user_role == 'Admin' else "USER"
     st.markdown(f"""<div class="profile-card"><div style="font-size: 36px; margin-bottom:10px;">🛡️</div><div style="font-weight:800; font-size:22px; color:#2c3e50;">{st.session_state.current_user}</div><div style="font-size:11px; color:white; background:#34495e; padding:4px 10px; border-radius:12px; display:inline-block; margin-bottom:5px;">{role_badge}</div><div style="font-size:13px; color:#7f8c8d; text-transform:uppercase; margin-top:5px;">{rank}</div><div style="background:#eec5a9; color:#d35400; padding:5px 10px; border-radius:8px; font-weight:bold; font-size:13px; display:inline-block; margin-top:10px;">Solved: {total_q}</div></div>""", unsafe_allow_html=True)
     st.write("---")
     
     if st.button("🏠 Home", use_container_width=True, type="secondary"): 
-        flush_stats_to_db() # Çıkarken kaydet
+        flush_stats_to_db()
         st.session_state.is_sprint_active = False; st.session_state.view = 'Main'; st.rerun()
     if st.button("📊 Analytics", use_container_width=True, type="secondary"): 
-        flush_stats_to_db() # Çıkarken kaydet
+        flush_stats_to_db()
         st.session_state.is_sprint_active = False; st.session_state.view = 'Analytics'; st.rerun()
     if st.button("⚙️ Settings", use_container_width=True, type="secondary"): 
         flush_stats_to_db() 
@@ -299,7 +292,7 @@ with st.sidebar:
             st.session_state.is_sprint_active = False; st.session_state.view = 'Admin'; st.rerun()
     st.write("")
     if st.button("🚪 Logout", use_container_width=True, type="secondary"): 
-        flush_stats_to_db() # Çıkarken kaydet
+        flush_stats_to_db()
         for key in list(st.session_state.keys()): del st.session_state[key]
         st.rerun()
 
@@ -391,7 +384,7 @@ elif st.session_state.view == 'Study' and st.session_state.smart_list is not Non
     with c_tm: ph = st.empty()
     with c_ex:
         if st.button("Exit ❌", use_container_width=True, type="secondary"): 
-            flush_stats_to_db() # Çıkarken kaydet
+            flush_stats_to_db()
             st.session_state.is_sprint_active = False; st.session_state.view = 'Main'; st.rerun()
 
     end = False
@@ -405,17 +398,47 @@ elif st.session_state.view == 'Study' and st.session_state.smart_list is not Non
         ph.markdown(f'<div class="timer-box">Question {cur} / {tot}</div>', unsafe_allow_html=True)
 
     if end: 
-        flush_stats_to_db() # Bitişte kaydet
+        flush_stats_to_db()
         st.session_state.is_sprint_active = False; st.session_state.view = 'Score_Summary'; st.rerun()
 
     if st.session_state.q_idx < len(st.session_state.smart_list):
         curr = st.session_state.smart_list.iloc[st.session_state.q_idx]
-        st.markdown(f"""<div class="q-card"><h3>{html.escape(curr["content_text"])}</h3></div>""", unsafe_allow_html=True)
+        tn = TOPIC_MAP.get(str(curr['topic_id']).split('.')[0], 'General')
+        bdg = "🔴 REVIEW MODE" if st.session_state.mode == 'Review' else f"📍 {tn.upper()}"
+        st.markdown(f"""<div class="q-card"><div style="color:#6c757d; font-size:14px; margin-bottom:15px; font-weight:600; letter-spacing:1px;">{bdg}</div><h3>{html.escape(curr["content_text"])}</h3></div>""", unsafe_allow_html=True)
         
-        with st.expander("💡 🤖 Need a Hint?"):
-            enc = urllib.parse.quote(curr["content_text"] + " CISSP explanation")
-            st.markdown(f"""<a href="https://www.google.com/search?q={enc}" target="_blank"><div class="ai-btn">Google Search</div></a>""", unsafe_allow_html=True)
-            st.text_area("Copy Prompt:", value=f"Explain:\n'{curr['content_text']}'")
+        # --- GELİŞMİŞ AI DESTEK ALANI ---
+        with st.expander("💡 🤖 Need a Hint? (AI & Search Tools)"):
+            # Google Search String (Soru + Şıklar + Context)
+            search_str = f"{curr['content_text']} Options: A) {curr['option_a']} B) {curr['option_b']} C) {curr['option_c']} D) {curr['option_d']} CISSP Exam Question"
+            # URL'ye uygun hale getir
+            enc_q = urllib.parse.quote(search_str)
+            
+            c_h1, c_h2 = st.columns([1, 1])
+            with c_h1:
+                # Link buton
+                st.markdown(f"""
+                <a href="https://www.google.com/search?q={enc_q}" target="_blank" style="text-decoration:none;">
+                    <div class="ai-btn">🌐 Search on Google (with Options)</div>
+                </a>
+                """, unsafe_allow_html=True)
+            
+            with c_h2:
+                # Gelişmiş Prompt
+                dom_name = TOPIC_MAP.get(str(curr['topic_id']).split('.')[0], 'CISSP General')
+                prompt = f"""Act as a CISSP expert. Analyze this question from Domain: {dom_name}.
+Explain why the correct answer is the best choice, and why the other options are incorrect.
+
+Question:
+{curr['content_text']}
+
+Options:
+A) {curr['option_a']}
+B) {curr['option_b']}
+C) {curr['option_c']}
+D) {curr['option_d']}"""
+                st.text_area("📋 Copy Prompt for ChatGPT/Claude:", value=prompt, height=150)
+        # --------------------------------
 
         c1, c2 = st.columns(2)
         opts = [('A', 'option_a'), ('B', 'option_b'), ('C', 'option_c'), ('D', 'option_d')]
@@ -434,11 +457,9 @@ elif st.session_state.view == 'Study' and st.session_state.smart_list is not Non
                 st.markdown(f'<div class="explanation-box">{html.escape(str(curr["explanation"]))}</div>', unsafe_allow_html=True)
                 c1, c2 = st.columns(2)
                 if c1.button("Next (Sure)", type="primary", use_container_width=True): 
-                    save_stat_local(st.session_state.last_q_id, True, "Sure", "None") # LOCAL SAVE
-                    st.session_state.q_idx+=1; st.session_state.feedback=None; st.rerun()
+                    save_stat_local(st.session_state.last_q_id, True, "Sure", "None"); st.session_state.q_idx+=1; st.session_state.feedback=None; st.rerun()
                 if c2.button("Next (Guess)", type="primary", use_container_width=True): 
-                    save_stat_local(st.session_state.last_q_id, True, "Guessed", "None") # LOCAL SAVE
-                    st.session_state.q_idx+=1; st.session_state.feedback=None; st.rerun()
+                    save_stat_local(st.session_state.last_q_id, True, "Guessed", "None"); st.session_state.q_idx+=1; st.session_state.feedback=None; st.rerun()
             else:
                 st.error(f"❌ Wrong. {curr['correct_option']}")
                 st.markdown(f'<div class="explanation-box">{html.escape(str(curr["explanation"]))}</div>', unsafe_allow_html=True)
@@ -447,11 +468,11 @@ elif st.session_state.view == 'Study' and st.session_state.smart_list is not Non
                 if c2.button("Attention", type="primary", use_container_width=True): save_stat_local(st.session_state.last_q_id, False, "None", "Attention"); st.session_state.q_idx+=1; st.session_state.feedback=None; st.rerun()
                 if c3.button("Logic", type="primary", use_container_width=True): save_stat_local(st.session_state.last_q_id, False, "None", "Interpretation"); st.session_state.q_idx+=1; st.session_state.feedback=None; st.rerun()
     else: 
-        flush_stats_to_db() # Liste bitti, kaydet
+        flush_stats_to_db()
         st.session_state.is_sprint_active = False; st.session_state.view = 'Score_Summary'; st.rerun()
 
 elif st.session_state.view == 'Score_Summary':
-    flush_stats_to_db() # Garanti olsun diye tekrar çağır (boşsa işlem yapmaz)
+    flush_stats_to_db()
     sc = st.session_state.sprint_score; tot = st.session_state.sprint_total_attempted
     ac = (sc / tot * 100) if tot > 0 else 0
     st.markdown(f"""<div style="text-align:center; padding: 60px; background:white; border-radius:20px; box-shadow:0 10px 30px rgba(0,0,0,0.1); margin-top:20px;"><h1 style="color:#2c3e50; font-size: 45px;">🏁 Finished!</h1><div style="font-size: 90px; font-weight: 800; color:#0d6efd; margin: 20px 0;">{sc} / {tot}</div><h3 style="color:#6c757d;">ACCURACY: {ac:.1f}%</h3></div>""", unsafe_allow_html=True)
@@ -462,7 +483,7 @@ elif st.session_state.view == 'Score_Summary':
 elif st.session_state.view == 'Analytics':
     st.header("📊 Intelligence Dashboard")
     try:
-        stats = conn.read(worksheet="User_Stats", ttl=0) # Analiz için güncel veri şart
+        stats = conn.read(worksheet="User_Stats", ttl=0)
         if not stats.empty: stats = stats[stats['user_id'] == st.session_state.current_user]
         questions = conn.read(worksheet="Questions", ttl=3600)
         if not stats.empty and not questions.empty:
@@ -477,8 +498,8 @@ elif st.session_state.view == 'Analytics':
             k3.markdown(f'<div class="metric-card"><div class="metric-num">{merged["qid"].nunique()}</div><div class="metric-lbl">Unique Qs</div></div>', unsafe_allow_html=True)
             
             st.write("---"); c1, c2 = st.columns([1,2])
-            merged['Result'] = merged['is_correct_val'].apply(lambda x: 'TRUE' if x == 1 else 'FALSE')
-            with c1: st.plotly_chart(px.pie(merged, names='Result', title="Ratio", color_discrete_map={'TRUE':'#198754','FALSE':'#dc3545'}), use_container_width=True)
+            merged['Result'] = merged['is_correct_val'].apply(lambda x: 'Correct' if x == 1 else 'Wrong')
+            with c1: st.plotly_chart(px.pie(merged, names='Result', title="Ratio", color='Result', color_discrete_map={'Correct':'#2ecc71','Wrong':'#e74c3c'}, hole=0.5), use_container_width=True)
             with c2: 
                 perf = merged.groupby('Domain')['is_correct_val'].mean().reset_index(); perf['Acc'] = perf['is_correct_val']*100
                 st.plotly_chart(px.bar(perf, x='Acc', y='Domain', orientation='h', title='Domain Mastery', color='Acc', color_continuous_scale='RdYlGn'), use_container_width=True)
