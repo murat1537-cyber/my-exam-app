@@ -9,6 +9,9 @@ import secrets
 import re
 import urllib.parse
 import html
+import pyotp  # 2FA için gerekli
+import qrcode # QR Kod üretimi için
+from io import BytesIO # QR Kodu resim olarak basmak için
 
 # --- 1. CISSP DOMAIN MAPPING ---
 TOPIC_MAP = {
@@ -70,7 +73,10 @@ defaults = {
     'sprint_score': 0, 'sprint_total_attempted': 0,
     'failed_login_attempts': 0,
     'last_activity_time': time.time(),
-    'unsaved_stats': [] 
+    'unsaved_stats': [],
+    # 2FA STATE
+    'login_step': 'credentials', # 'credentials' veya '2fa_check'
+    'temp_user_data': None # 2FA doğrulanana kadar kullanıcı verisini tut
 }
 for k, v in defaults.items():
     if k not in st.session_state: st.session_state[k] = v
@@ -113,7 +119,8 @@ def check_password(stored_password, input_password):
         return stored_password == input_password
 
 def get_all_users():
-    cols = ["username", "email", "password", "is_2fa_enabled", "gdpr_consent", "role", "security_question", "security_answer"]
+    # 2FA Secret sütunu eklendi
+    cols = ["username", "email", "password", "is_2fa_enabled", "gdpr_consent", "role", "security_question", "security_answer", "totp_secret"]
     try:
         df = conn.read(worksheet="Users", ttl=0)
         for col in cols: 
@@ -135,22 +142,67 @@ def register_new_user(username, email, password, gdpr, sec_q, sec_a):
     new_user = pd.DataFrame([{
         "username": clean_user, "email": clean_email, "password": hash_password(password.strip()),
         "is_2fa_enabled": "FALSE", "gdpr_consent": "TRUE" if gdpr else "FALSE", "role": "User",
-        "security_question": sec_q, "security_answer": hash_password(sec_a.strip().lower())
+        "security_question": sec_q, "security_answer": hash_password(sec_a.strip().lower()),
+        "totp_secret": ""
     }])
     conn.update(worksheet="Users", data=pd.concat([users, new_user], ignore_index=True))
     return True, "Created!"
 
-def verify_login(username, password):
-    if st.session_state.failed_login_attempts >= 5: return False, "LOCKED"
+# 2FA HELPER FUNCTIONS
+def verify_login_step1(username, password):
+    """
+    Şifre doğru mu kontrol eder.
+    Eğer 2FA açıksa '2FA_REQ' döner, değilse 'SUCCESS' döner.
+    """
+    if st.session_state.failed_login_attempts >= 5: return False, "LOCKED", None
     users = get_all_users()
-    if users.empty: return False, None
+    if users.empty: return False, "INVALID", None
+    
     user_rec = users[users['username'].astype(str).str.strip() == str(username).strip()]
     if not user_rec.empty:
         if check_password(user_rec.iloc[0]['password'], password):
-            st.session_state.failed_login_attempts = 0
+            # Şifre doğru. 2FA kontrolü yap.
+            is_2fa = clean_boolean(user_rec.iloc[0]['is_2fa_enabled'])
             role = user_rec.iloc[0].get('role', 'User')
-            return True, str(role).strip() if pd.notna(role) else 'User'
-    return False, None
+            role = str(role).strip() if pd.notna(role) else 'User'
+            
+            user_data = {
+                'username': str(username).strip(),
+                'role': role,
+                'secret': str(user_rec.iloc[0].get('totp_secret', ''))
+            }
+            
+            if is_2fa:
+                return True, "2FA_REQ", user_data
+            else:
+                return True, "SUCCESS", user_data
+                
+    return False, "INVALID", None
+
+def verify_totp_code(secret, code):
+    if not secret or len(secret) < 16: return False # Secret yoksa
+    totp = pyotp.TOTP(secret)
+    return totp.verify(code)
+
+def enable_2fa_for_user(username, secret):
+    users = get_all_users()
+    idx = users.index[users['username'].astype(str).str.strip() == username].tolist()
+    if idx:
+        users.at[idx[0], 'totp_secret'] = secret
+        users.at[idx[0], 'is_2fa_enabled'] = "TRUE"
+        conn.update(worksheet="Users", data=users)
+        return True
+    return False
+
+def disable_2fa_for_user(username):
+    users = get_all_users()
+    idx = users.index[users['username'].astype(str).str.strip() == username].tolist()
+    if idx:
+        users.at[idx[0], 'totp_secret'] = ""
+        users.at[idx[0], 'is_2fa_enabled'] = "FALSE"
+        conn.update(worksheet="Users", data=users)
+        return True
+    return False
 
 def save_stat_local(q_id, correct, confidence, reason):
     st.session_state.unsaved_stats.append({
@@ -266,11 +318,9 @@ def start_review():
     except Exception as e: st.error("Error loading review.")
 
 # --- SIDEBAR CONTROL & GÜVENLİĞİ ---
-# 1. GÜVENLİK ÖNLEMİ: Giriş yapılmadıysa sayfayı zorla 'Main' (Login) yap
 if not st.session_state.is_logged_in:
     st.session_state.view = 'Main'
 
-# 2. SIDEBAR SADECE GİRİŞ YAPILDIĞINDA GÖRÜNSÜN
 if st.session_state.is_logged_in:
     with st.sidebar:
         try:
@@ -308,19 +358,54 @@ if st.session_state.view == 'Main':
         with c2:
             st.markdown("""<div class="login-wrapper"><div style="font-size: 50px;">🛡️</div><div class="login-title">CISSP Mentor Pro</div><div class="login-subtitle">Your AI-Powered Certification Partner</div></div>""", unsafe_allow_html=True)
             tab1, tab2, tab3 = st.tabs(["🔑 LOGIN", "📝 SIGN UP", "🆘 RECOVERY"])
+            
             with tab1:
                 st.write("")
                 if st.session_state.failed_login_attempts >= 5: st.error("🔒 Account locked.")
                 else:
-                    with st.form("l_form"):
-                        u = st.text_input("Username"); p = st.text_input("Password", type="password")
-                        if st.form_submit_button("Login", type="primary", use_container_width=True):
-                            time.sleep(0.5)
-                            suc, role = verify_login(u, p)
-                            if suc: st.session_state.is_logged_in=True; st.session_state.current_user=u.strip(); st.session_state.user_role=role; st.rerun()
-                            else: 
-                                st.session_state.failed_login_attempts += 1
-                                st.error("Invalid credentials.")
+                    if st.session_state.login_step == 'credentials':
+                        with st.form("l_form"):
+                            u = st.text_input("Username"); p = st.text_input("Password", type="password")
+                            if st.form_submit_button("Login", type="primary", use_container_width=True):
+                                time.sleep(0.5)
+                                success, msg, data = verify_login_step1(u, p)
+                                if success and msg == "SUCCESS":
+                                    # Direkt Giriş
+                                    st.session_state.is_logged_in=True
+                                    st.session_state.current_user=data['username']
+                                    st.session_state.user_role=data['role']
+                                    st.session_state.failed_login_attempts=0
+                                    st.rerun()
+                                elif success and msg == "2FA_REQ":
+                                    # 2FA Gerekli
+                                    st.session_state.login_step = '2fa_check'
+                                    st.session_state.temp_user_data = data
+                                    st.session_state.failed_login_attempts=0
+                                    st.rerun()
+                                else:
+                                    st.session_state.failed_login_attempts += 1
+                                    st.error("Invalid credentials.")
+                    
+                    elif st.session_state.login_step == '2fa_check':
+                        st.info("🔐 Two-Factor Authentication Required")
+                        with st.form("2fa_form"):
+                            code = st.text_input("Enter 6-digit Authenticator Code", max_chars=6)
+                            if st.form_submit_button("Verify Code", type="primary", use_container_width=True):
+                                secret = st.session_state.temp_user_data.get('secret')
+                                if verify_totp_code(secret, code):
+                                    st.session_state.is_logged_in=True
+                                    st.session_state.current_user=st.session_state.temp_user_data['username']
+                                    st.session_state.user_role=st.session_state.temp_user_data['role']
+                                    st.session_state.login_step = 'credentials'
+                                    st.session_state.temp_user_data = None
+                                    st.rerun()
+                                else:
+                                    st.error("❌ Invalid Code")
+                        if st.button("Cancel Login"):
+                            st.session_state.login_step = 'credentials'
+                            st.session_state.temp_user_data = None
+                            st.rerun()
+
             with tab2:
                 st.write("")
                 with st.form("s_form"):
@@ -358,8 +443,9 @@ if st.session_state.view == 'Main':
             if st.button("↺ Review Errors", type="secondary"): start_review()
 
 elif st.session_state.view == 'Settings':
-    if not st.session_state.is_logged_in: st.session_state.view='Main'; st.rerun() # GÜVENLİK
-    st.header("⚙️ Settings"); t1, t2 = st.tabs(["Account", "Security"])
+    if not st.session_state.is_logged_in: st.session_state.view='Main'; st.rerun() 
+    st.header("⚙️ Settings"); t1, t2, t3 = st.tabs(["Account", "Security", "2FA (Authenticator)"])
+    
     with t1:
         with st.form("e_up"):
             e = st.text_input("New Email"); 
@@ -380,9 +466,51 @@ elif st.session_state.view == 'Settings':
                 suc, msg = update_security_settings(st.session_state.current_user, q, a)
                 if suc: st.success(msg)
                 else: st.error(msg)
+    
+    # --- 2FA AYARLARI ---
+    with t3:
+        st.markdown("### 🔐 Two-Factor Authentication")
+        users = get_all_users()
+        user_row = users[users['username'].astype(str).str.strip() == st.session_state.current_user]
+        is_enabled = False
+        if not user_row.empty:
+            is_enabled = clean_boolean(user_row.iloc[0].get('is_2fa_enabled', 'FALSE'))
+        
+        if is_enabled:
+            st.success("✅ 2FA is currently ENABLED.")
+            if st.button("Disable 2FA", type="secondary"):
+                if disable_2fa_for_user(st.session_state.current_user):
+                    st.success("2FA Disabled."); time.sleep(1); st.rerun()
+        else:
+            st.warning("⚠️ 2FA is DISABLED. Enable it for better security.")
+            if 'temp_secret' not in st.session_state:
+                st.session_state.temp_secret = pyotp.random_base32()
+            
+            # QR Kod Oluştur
+            totp = pyotp.TOTP(st.session_state.temp_secret)
+            uri = totp.provisioning_uri(name=st.session_state.current_user, issuer_name="CISSP Mentor")
+            qr = qrcode.make(uri)
+            img_bytes = BytesIO()
+            qr.save(img_bytes, format='PNG')
+            
+            c1, c2 = st.columns([1, 2])
+            with c1:
+                st.image(img_bytes, caption="Scan with Google Auth", width=200)
+            with c2:
+                st.write("1. Install Google Authenticator or Authy.")
+                st.write("2. Scan the QR code.")
+                st.write("3. Enter the 6-digit code below to confirm.")
+                
+                c_code = st.text_input("Verification Code", max_chars=6)
+                if st.button("Verify & Enable 2FA", type="primary"):
+                    if totp.verify(c_code):
+                        if enable_2fa_for_user(st.session_state.current_user, st.session_state.temp_secret):
+                            st.success("2FA Enabled Successfully!"); del st.session_state.temp_secret; time.sleep(1); st.rerun()
+                    else:
+                        st.error("Invalid Code.")
 
 elif st.session_state.view == 'Study' and st.session_state.smart_list is not None:
-    if not st.session_state.is_logged_in: st.session_state.view='Main'; st.rerun() # GÜVENLİK
+    if not st.session_state.is_logged_in: st.session_state.view='Main'; st.rerun()
     c_back, c_tm, c_ex = st.columns([1, 2, 1])
     with c_back:
         if st.session_state.q_idx > 0:
@@ -391,7 +519,7 @@ elif st.session_state.view == 'Study' and st.session_state.smart_list is not Non
     with c_tm: ph = st.empty()
     with c_ex:
         if st.button("Exit ❌", use_container_width=True, type="secondary"): 
-            flush_stats_to_db() # Çıkarken kaydet
+            flush_stats_to_db() 
             st.session_state.is_sprint_active = False; st.session_state.view = 'Main'; st.rerun()
 
     end = False
@@ -405,7 +533,7 @@ elif st.session_state.view == 'Study' and st.session_state.smart_list is not Non
         ph.markdown(f'<div class="timer-box">Question {cur} / {tot}</div>', unsafe_allow_html=True)
 
     if end: 
-        flush_stats_to_db() # Bitişte kaydet
+        flush_stats_to_db()
         st.session_state.is_sprint_active = False; st.session_state.view = 'Score_Summary'; st.rerun()
 
     if st.session_state.q_idx < len(st.session_state.smart_list):
@@ -434,10 +562,10 @@ elif st.session_state.view == 'Study' and st.session_state.smart_list is not Non
                 st.markdown(f'<div class="explanation-box">{html.escape(str(curr["explanation"]))}</div>', unsafe_allow_html=True)
                 c1, c2 = st.columns(2)
                 if c1.button("Next (Sure)", type="primary", use_container_width=True): 
-                    save_stat_local(st.session_state.last_q_id, True, "Sure", "None") # LOCAL SAVE
+                    save_stat_local(st.session_state.last_q_id, True, "Sure", "None") 
                     st.session_state.q_idx+=1; st.session_state.feedback=None; st.rerun()
                 if c2.button("Next (Guess)", type="primary", use_container_width=True): 
-                    save_stat_local(st.session_state.last_q_id, True, "Guessed", "None") # LOCAL SAVE
+                    save_stat_local(st.session_state.last_q_id, True, "Guessed", "None") 
                     st.session_state.q_idx+=1; st.session_state.feedback=None; st.rerun()
             else:
                 st.error(f"❌ Wrong. {curr['correct_option']}")
@@ -447,11 +575,11 @@ elif st.session_state.view == 'Study' and st.session_state.smart_list is not Non
                 if c2.button("Attention", type="primary", use_container_width=True): save_stat_local(st.session_state.last_q_id, False, "None", "Attention"); st.session_state.q_idx+=1; st.session_state.feedback=None; st.rerun()
                 if c3.button("Logic", type="primary", use_container_width=True): save_stat_local(st.session_state.last_q_id, False, "None", "Interpretation"); st.session_state.q_idx+=1; st.session_state.feedback=None; st.rerun()
     else: 
-        flush_stats_to_db() # Liste bitti, kaydet
+        flush_stats_to_db() 
         st.session_state.is_sprint_active = False; st.session_state.view = 'Score_Summary'; st.rerun()
 
 elif st.session_state.view == 'Score_Summary':
-    if not st.session_state.is_logged_in: st.session_state.view='Main'; st.rerun() # GÜVENLİK
+    if not st.session_state.is_logged_in: st.session_state.view='Main'; st.rerun() 
     flush_stats_to_db()
     sc = st.session_state.sprint_score; tot = st.session_state.sprint_total_attempted
     ac = (sc / tot * 100) if tot > 0 else 0
@@ -461,10 +589,10 @@ elif st.session_state.view == 'Score_Summary':
     if c2.button("📊 Analytics", use_container_width=True, type="secondary"): st.session_state.view = 'Analytics'; st.rerun()
 
 elif st.session_state.view == 'Analytics':
-    if not st.session_state.is_logged_in: st.session_state.view='Main'; st.rerun() # GÜVENLİK
+    if not st.session_state.is_logged_in: st.session_state.view='Main'; st.rerun() 
     st.header("📊 Intelligence Dashboard")
     try:
-        stats = conn.read(worksheet="User_Stats", ttl=0) # Analiz için güncel veri şart
+        stats = conn.read(worksheet="User_Stats", ttl=0) 
         if not stats.empty: stats = stats[stats['user_id'] == st.session_state.current_user]
         questions = conn.read(worksheet="Questions", ttl=3600)
         if not stats.empty and not questions.empty:
