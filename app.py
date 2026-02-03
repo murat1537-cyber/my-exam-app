@@ -527,6 +527,8 @@ if st.session_state.view == 'Main':
     else: 
         st.title("🛡️ CISSP Mentor Pro"); st.markdown(f"**Welcome, {st.session_state.current_user}!**")
         dom = st.selectbox("Target Domain:", ["All Domains (Mix)"] + list(TOPIC_MAP.values()))
+        
+        st.write("")
         c1, c2 = st.columns(2); c3, c4 = st.columns(2)
         with c1: 
             if st.button("⏱️ 10 Min Sprint", type="primary"): start_sprint('Time', 600, dom)
@@ -536,6 +538,11 @@ if st.session_state.view == 'Main':
             if st.button("📝 10 Questions", type="primary"): start_sprint('Count', 10, dom)
         with c4: 
             if st.button("↺ Review Errors", type="secondary"): start_review()
+            
+        # --- YENİ EKLENEN BUTON ---
+        st.write("")
+        if st.button("🔥 Full Mock Exam (100 Qs - 3 Hours)", type="primary", use_container_width=True):
+            start_sprint('Mock', 0, dom)
 
 elif st.session_state.view == 'Settings':
     if not st.session_state.is_logged_in: st.session_state.view='Main'; st.rerun() 
