@@ -685,25 +685,49 @@ D) {curr['option_d']}"""
                     if st.session_state.feedback: st.session_state.sprint_score += 1
                     st.session_state.sprint_total_attempted += 1
                     st.rerun()
+       # --- GÜNCELLENMİŞ FEEDBACK ALANI ---
         if st.session_state.feedback is not None:
             st.write("---")
+            
+            # Doğru şıkkın tam metnini veritabanından çekiyoruz
+            # Örn: 'B' -> 'option_b' sütunundaki yazı
+            correct_letter = curr['correct_option']
+            correct_text = curr[f"option_{correct_letter.lower()}"]
+            
             if st.session_state.feedback:
-                st.success(f"✅ Correct! {curr['correct_option']}")
+                # DOĞRU CEVAP MESAJI
+                st.success(f"✅ Correct! Correct answer is {correct_letter}) {correct_text}")
+                
+                # Açıklama Kutusu
                 st.markdown(f'<div class="explanation-box">{html.escape(str(curr["explanation"]))}</div>', unsafe_allow_html=True)
+                
+                # İlerleme Butonları
                 c1, c2 = st.columns(2)
                 if c1.button("Next (Sure)", type="primary", use_container_width=True): 
-                    save_stat_local(st.session_state.last_q_id, True, "Sure", "None") 
+                    save_stat_local(st.session_state.last_q_id, True, "Sure", "None")
                     st.session_state.q_idx+=1; st.session_state.feedback=None; st.rerun()
                 if c2.button("Next (Guess)", type="primary", use_container_width=True): 
-                    save_stat_local(st.session_state.last_q_id, True, "Guessed", "None") 
+                    save_stat_local(st.session_state.last_q_id, True, "Guessed", "None")
                     st.session_state.q_idx+=1; st.session_state.feedback=None; st.rerun()
             else:
-                st.error(f"❌ Wrong. {curr['correct_option']}")
+                # YANLIŞ CEVAP MESAJI
+                st.error(f"❌ Wrong! Correct answer is {correct_letter}) {correct_text}")
+                
+                # Açıklama Kutusu
                 st.markdown(f'<div class="explanation-box">{html.escape(str(curr["explanation"]))}</div>', unsafe_allow_html=True)
+                
+                # Hata Analiz Butonları
                 c1, c2, c3 = st.columns(3)
-                if c1.button("Knowledge", type="primary", use_container_width=True): save_stat_local(st.session_state.last_q_id, False, "None", "Knowledge Gap"); st.session_state.q_idx+=1; st.session_state.feedback=None; st.rerun()
-                if c2.button("Attention", type="primary", use_container_width=True): save_stat_local(st.session_state.last_q_id, False, "None", "Attention"); st.session_state.q_idx+=1; st.session_state.feedback=None; st.rerun()
-                if c3.button("Logic", type="primary", use_container_width=True): save_stat_local(st.session_state.last_q_id, False, "None", "Interpretation"); st.session_state.q_idx+=1; st.session_state.feedback=None; st.rerun()
+                if c1.button("Knowledge", type="primary", use_container_width=True): 
+                    save_stat_local(st.session_state.last_q_id, False, "None", "Knowledge Gap")
+                    st.session_state.q_idx+=1; st.session_state.feedback=None; st.rerun()
+                if c2.button("Attention", type="primary", use_container_width=True): 
+                    save_stat_local(st.session_state.last_q_id, False, "None", "Attention")
+                    st.session_state.q_idx+=1; st.session_state.feedback=None; st.rerun()
+                if c3.button("Logic", type="primary", use_container_width=True): 
+                    save_stat_local(st.session_state.last_q_id, False, "None", "Interpretation")
+                    st.session_state.q_idx+=1; st.session_state.feedback=None; st.rerun()
+        # -----------------------------------
     else: 
         flush_stats_to_db() 
         st.session_state.is_sprint_active = False; st.session_state.view = 'Score_Summary'; st.rerun()
