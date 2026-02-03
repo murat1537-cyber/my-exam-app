@@ -366,12 +366,30 @@ def prepare_sprint_data(dom):
 def start_sprint(m_type, val, dom):
     q = prepare_sprint_data(dom)
     if q.empty: st.error("No questions."); return
-    c = min(len(q), 40) if m_type == 'Time' else min(len(q), val)
+    
+    # --- GÜNCELLENEN MANTIK ---
+    if m_type == 'Mock':
+        # Mock Modu: 100 Soru, Zamanlayıcı Aktif, Süre 3 Saat (10800 sn)
+        c = min(len(q), 100)
+        st.session_state.sprint_type = 'Time'
+        st.session_state.sprint_target = 10800 
+    elif m_type == 'Time':
+        # Klasik Sprint: Max 40 Soru, Zamanlayıcı Aktif
+        c = min(len(q), 40)
+        st.session_state.sprint_type = 'Time'
+        st.session_state.sprint_target = val
+    else: 
+        # Soru Sayısı Modu: Zamanlayıcı Yok (Soru X/Y gösterir)
+        c = min(len(q), val)
+        st.session_state.sprint_type = 'Count'
+        st.session_state.sprint_target = val
+    # --------------------------
+
     st.session_state.smart_list = q.sample(n=c).reset_index(drop=True)
     st.session_state.q_idx = 0; st.session_state.start_time = time.time()
     st.session_state.is_sprint_active = True; st.session_state.view = 'Study'
-    st.session_state.mode = 'Normal'; st.session_state.sprint_type = m_type
-    st.session_state.sprint_target = val; st.session_state.sprint_score = 0; st.session_state.sprint_total_attempted = 0
+    st.session_state.mode = 'Normal'
+    st.session_state.sprint_score = 0; st.session_state.sprint_total_attempted = 0
     st.rerun()
 
 def start_review():
