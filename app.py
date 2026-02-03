@@ -613,10 +613,42 @@ elif st.session_state.view == 'Study' and st.session_state.smart_list is not Non
         curr = st.session_state.smart_list.iloc[st.session_state.q_idx]
         st.markdown(f"""<div class="q-card"><h3>{html.escape(curr["content_text"])}</h3></div>""", unsafe_allow_html=True)
         
-        with st.expander("💡 🤖 Need a Hint?"):
-            enc = urllib.parse.quote(curr["content_text"] + " CISSP explanation")
-            st.markdown(f"""<a href="https://www.google.com/search?q={enc}" target="_blank"><div class="ai-btn">Google Search</div></a>""", unsafe_allow_html=True)
-            st.text_area("Copy Prompt:", value=f"Explain:\n'{curr['content_text']}'")
+        # --- AI DESTEK ALANI (DÜZELTİLMİŞ HALİ) ---
+        with st.expander("💡 🤖 Need a Hint? (AI & Search Tools)"):
+            # 1. Google Araması için Soru + Şıklar Metni Hazırla
+            q_text_raw = curr["content_text"]
+            # Şıkları tek satırda birleştir
+            options_inline = f"A) {curr['option_a']} B) {curr['option_b']} C) {curr['option_c']} D) {curr['option_d']}"
+            
+            # Google'a gidecek tam metin: Soru + Şıklar + Anahtar Kelime
+            search_str = f"{q_text_raw} {options_inline} CISSP explanation"
+            enc_q = urllib.parse.quote(search_str)
+            
+            c_h1, c_h2 = st.columns([1, 1])
+            with c_h1:
+                # Google Linki
+                st.markdown(f"""
+                <a href="https://www.google.com/search?q={enc_q}" target="_blank" style="text-decoration:none;">
+                    <div class="ai-btn">🌐 Search on Google (w/ Options)</div>
+                </a>
+                """, unsafe_allow_html=True)
+            
+            with c_h2:
+                # 2. ChatGPT için Prompt Hazırla (Alt alta düzenli format)
+                prompt = f"""Act as a CISSP expert. Analyze this question.
+Explain why the correct answer is the best choice, and why the other options are incorrect.
+
+Question:
+{q_text_raw}
+
+Options:
+A) {curr['option_a']}
+B) {curr['option_b']}
+C) {curr['option_c']}
+D) {curr['option_d']}"""
+                
+                st.text_area("📋 Copy Prompt for ChatGPT/Claude:", value=prompt, height=200)
+        # -------------------------------------------------------
 
         c1, c2 = st.columns(2)
         opts = [('A', 'option_a'), ('B', 'option_b'), ('C', 'option_c'), ('D', 'option_d')]
