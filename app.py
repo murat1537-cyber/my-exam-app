@@ -365,26 +365,40 @@ def prepare_sprint_data(dom):
     return q
 
 def start_sprint(m_type, val, dom):
+    # --- PREMIUM KONTROLÜ ---
+    users = get_all_users()
+    user_row = users[users['username'].astype(str).str.strip() == st.session_state.current_user]
+    is_premium = False
+    if not user_row.empty:
+        # 'TRUE', '1', 'YES' gibi değerleri kabul et
+        raw_val = user_row.iloc[0].get('is_premium', 'FALSE')
+        is_premium = str(raw_val).strip().upper() in ['TRUE', '1', 'YES', 'ON']
+    
+    # Eğer kullanıcı Premium değilse ve "Deneme" modunu (Mock Exam) açmaya çalışıyorsa engelle
+    if not is_premium:
+        if m_type == 'Mock' or val > 5: # Limit: Sadece 5 soruya izin ver
+            st.error("🔒 This feature is for PREMIUM members only.")
+            st.info("To unlock full access, please upgrade your account.")
+            # Buraya kendi ödeme linkinizi (Stripe/Shopier) koyabilirsiniz
+            st.markdown("[👉 Click here to Upgrade for $19.99](https://buy.stripe.com/test_link)", unsafe_allow_html=True)
+            return
+    # ------------------------
+
     q = prepare_sprint_data(dom)
     if q.empty: st.error("No questions."); return
     
-    # --- GÜNCELLENEN MANTIK ---
     if m_type == 'Mock':
-        # Mock Modu: 100 Soru, Zamanlayıcı Aktif, Süre 3 Saat (10800 sn)
         c = min(len(q), 100)
         st.session_state.sprint_type = 'Time'
         st.session_state.sprint_target = 10800 
     elif m_type == 'Time':
-        # Klasik Sprint: Max 40 Soru, Zamanlayıcı Aktif
         c = min(len(q), 40)
         st.session_state.sprint_type = 'Time'
-        st.session_state.sprint_target = val
-    else: 
-        # Soru Sayısı Modu: Zamanlayıcı Yok (Soru X/Y gösterir)
+        st.session_state.sprint_target = 600
+    else:
         c = min(len(q), val)
         st.session_state.sprint_type = 'Count'
         st.session_state.sprint_target = val
-    # --------------------------
 
     st.session_state.smart_list = q.sample(n=c).reset_index(drop=True)
     st.session_state.q_idx = 0; st.session_state.start_time = time.time()
