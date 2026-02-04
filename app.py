@@ -465,70 +465,96 @@ if st.session_state.is_logged_in:
 # --- VIEWS ---
 if st.session_state.view == 'Main':
     if not st.session_state.is_logged_in: # Login Flow
+        # Kurtarma ekranı geçişi için state kontrolü
+        if 'show_recovery' not in st.session_state: st.session_state.show_recovery = False
+
         c1, c2, c3 = st.columns([1, 1.5, 1])
         with c2:
             st.markdown("""<div class="login-wrapper"><div style="font-size: 50px;">🛡️</div><div class="login-title">CISSP Mentor Pro</div><div class="login-subtitle">Your AI-Powered Certification Partner</div></div>""", unsafe_allow_html=True)
-            tab1, tab2, tab3 = st.tabs(["🔑 LOGIN", "📝 SIGN UP", "🆘 RECOVERY"])
             
-            with tab1:
-                st.write("")
-                if st.session_state.failed_login_attempts >= 5: st.error("🔒 Account locked.")
-                else:
-                    if st.session_state.login_step == 'credentials':
-                        with st.form("l_form"):
-                            u = st.text_input("Username"); p = st.text_input("Password", type="password")
-                            if st.form_submit_button("Login", type="primary", use_container_width=True):
-                                time.sleep(0.5)
-                                success, msg, data = verify_login_step1(u, p)
-                                if success and msg == "SUCCESS":
-                                    log_audit_event("LOGIN_SUCCESS", data['username'], "Login without 2FA")
-                                    st.session_state.is_logged_in=True; st.session_state.current_user=data['username']; st.session_state.user_role=data['role']; st.session_state.failed_login_attempts=0; st.rerun()
-                                elif success and msg == "2FA_REQ":
-                                    st.session_state.login_step = '2fa_check'; st.session_state.temp_user_data = data; st.session_state.failed_login_attempts=0; st.rerun()
-                                else:
-                                    st.session_state.failed_login_attempts += 1; st.error("Invalid credentials.")
-                    elif st.session_state.login_step == '2fa_check':
-                        st.info("🔐 Two-Factor Authentication Required")
-                        with st.form("2fa_form"):
-                            code = st.text_input("Enter 6-digit Authenticator Code", max_chars=6)
-                            if st.form_submit_button("Verify Code", type="primary", use_container_width=True):
-                                secret = st.session_state.temp_user_data.get('secret')
-                                if verify_totp_code(secret, code):
-                                    log_audit_event("LOGIN_SUCCESS", st.session_state.temp_user_data['username'], "Login with 2FA")
-                                    st.session_state.is_logged_in=True; st.session_state.current_user=st.session_state.temp_user_data['username']; st.session_state.user_role=st.session_state.temp_user_data['role']; st.session_state.login_step = 'credentials'; st.session_state.temp_user_data = None; st.rerun()
-                                else: 
-                                    log_audit_event("LOGIN_FAIL_2FA", st.session_state.temp_user_data['username'], "Invalid TOTP")
-                                    st.error("❌ Invalid Code")
-                        if st.button("Cancel Login"): st.session_state.login_step = 'credentials'; st.session_state.temp_user_data = None; st.rerun()
-
-            with tab2:
-                st.write("")
-                with st.form("s_form"):
-                    u = st.text_input("Username"); e = st.text_input("Email"); p = st.text_input("Password", type="password")
-                    st.markdown("---"); q = st.selectbox("Security Question", SECURITY_QUESTIONS); a = st.text_input("Answer")
-                    g = st.checkbox("GDPR Consent")
-                    if st.form_submit_button("Sign Up", type="secondary", use_container_width=True):
-                        suc, msg = register_new_user(u, e, p, g, q, a)
-                        if suc: st.success(msg)
-                        else: st.error(msg)
-            with tab3:
-                st.write(""); u = st.text_input("Username for Recovery")
+            # --- DURUM 1: KURTARMA EKRANI AKTİFSE ---
+            if st.session_state.show_recovery:
+                st.markdown("### 🔄 Account Recovery")
+                st.info("Enter your username to answer your security question.")
+                
+                if st.button("⬅️ Back to Login", type="secondary", use_container_width=True):
+                    st.session_state.show_recovery = False
+                    st.rerun()
+                
+                u = st.text_input("Username for Recovery")
                 if u:
                     has_q, quest = get_security_question(u)
                     if has_q:
-                        st.info(f"❓ {quest}")
+                        st.info(f"❓ Security Question: **{quest}**")
                         with st.form("r_form"):
-                            ans = st.text_input("Answer"); new_p = st.text_input("New Password", type="password")
-                            if st.form_submit_button("Reset", type="primary"):
+                            ans = st.text_input("Answer")
+                            new_p = st.text_input("New Password", type="password")
+                            if st.form_submit_button("Reset Password", type="primary", use_container_width=True):
                                 suc, msg = reset_password_with_security_answer(u, ans, new_p)
-                                if suc: st.success(msg)
+                                if suc: 
+                                    st.success(msg)
+                                    time.sleep(1.5)
+                                    st.session_state.show_recovery = False # Logine dön
+                                    st.rerun()
                                 else: st.error(msg)
-                    else: st.warning("User not found.")
-    else: 
+                    else: st.warning("User not found or security settings missing.")
+
+            # --- DURUM 2: NORMAL GİRİŞ EKRANI (2 TAB) ---
+            else:
+                tab1, tab2 = st.tabs(["🔑 LOGIN", "📝 SIGN UP"])
+                
+                with tab1:
+                    st.write("")
+                    if st.session_state.failed_login_attempts >= 5: st.error("🔒 Account locked.")
+                    else:
+                        if st.session_state.login_step == 'credentials':
+                            with st.form("l_form"):
+                                u = st.text_input("Username")
+                                p = st.text_input("Password", type="password")
+                                if st.form_submit_button("Login", type="primary", use_container_width=True):
+                                    time.sleep(0.5)
+                                    success, msg, data = verify_login_step1(u, p)
+                                    if success and msg == "SUCCESS":
+                                        log_audit_event("LOGIN_SUCCESS", data['username'], "Login without 2FA")
+                                        st.session_state.is_logged_in=True; st.session_state.current_user=data['username']; st.session_state.user_role=data['role']; st.session_state.failed_login_attempts=0; st.rerun()
+                                    elif success and msg == "2FA_REQ":
+                                        st.session_state.login_step = '2fa_check'; st.session_state.temp_user_data = data; st.session_state.failed_login_attempts=0; st.rerun()
+                                    else:
+                                        st.session_state.failed_login_attempts += 1; st.error("Invalid credentials.")
+                            
+                            # ŞİFREMİ UNUTTUM BUTONU (Formun Altında)
+                            st.write("")
+                            if st.button("❓ Forgot Password?", type="secondary", use_container_width=True):
+                                st.session_state.show_recovery = True
+                                st.rerun()
+
+                        elif st.session_state.login_step == '2fa_check':
+                            st.info("🔐 Two-Factor Authentication Required")
+                            with st.form("2fa_form"):
+                                code = st.text_input("Enter 6-digit Authenticator Code", max_chars=6)
+                                if st.form_submit_button("Verify Code", type="primary", use_container_width=True):
+                                    secret = st.session_state.temp_user_data.get('secret')
+                                    if verify_totp_code(secret, code):
+                                        log_audit_event("LOGIN_SUCCESS", st.session_state.temp_user_data['username'], "Login with 2FA")
+                                        st.session_state.is_logged_in=True; st.session_state.current_user=st.session_state.temp_user_data['username']; st.session_state.user_role=st.session_state.temp_user_data['role']; st.session_state.login_step = 'credentials'; st.session_state.temp_user_data = None; st.rerun()
+                                    else: 
+                                        log_audit_event("LOGIN_FAIL_2FA", st.session_state.temp_user_data['username'], "Invalid TOTP")
+                                        st.error("❌ Invalid Code")
+                            if st.button("Cancel Login"): st.session_state.login_step = 'credentials'; st.session_state.temp_user_data = None; st.rerun()
+
+                with tab2:
+                    st.write("")
+                    with st.form("s_form"):
+                        u = st.text_input("Username"); e = st.text_input("Email"); p = st.text_input("Password", type="password")
+                        st.markdown("---"); q = st.selectbox("Security Question", SECURITY_QUESTIONS); a = st.text_input("Answer")
+                        g = st.checkbox("GDPR Consent")
+                        if st.form_submit_button("Sign Up", type="secondary", use_container_width=True):
+                            suc, msg = register_new_user(u, e, p, g, q, a)
+                            if suc: st.success(msg)
+                            else: st.error(msg)
+    else: # Logged In Main
         st.title("🛡️ CISSP Mentor Pro"); st.markdown(f"**Welcome, {st.session_state.current_user}!**")
         dom = st.selectbox("Target Domain:", ["All Domains (Mix)"] + list(TOPIC_MAP.values()))
-        
-        st.write("")
         c1, c2 = st.columns(2); c3, c4 = st.columns(2)
         with c1: 
             if st.button("⏱️ 10 Min Sprint", type="primary"): start_sprint('Time', 600, dom)
@@ -538,8 +564,7 @@ if st.session_state.view == 'Main':
             if st.button("📝 10 Questions", type="primary"): start_sprint('Count', 10, dom)
         with c4: 
             if st.button("↺ Review Errors", type="secondary"): start_review()
-            
-        # --- YENİ EKLENEN BUTON ---
+        
         st.write("")
         if st.button("🔥 Full Mock Exam (100 Qs - 3 Hours)", type="primary", use_container_width=True):
             start_sprint('Mock', 0, dom)
