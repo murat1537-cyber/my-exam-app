@@ -235,38 +235,37 @@ def verify_login_step1(username, password):
     idx = users.index[users['username'].astype(str).str.strip() == str(username).strip()].tolist()
     
     if not idx:
-        # Kullanıcı yoksa sahte bir gecikme yap (Güvenlik: Timing Attack önleme)
         time.sleep(0.5) 
         log_audit_event("LOGIN_FAIL", username, "User not found")
         return False, "INVALID", None
         
     row_idx = idx[0]
-    user_row = users.iloc[row_idx]
+    user_row = users.iloc[row_idx] # Bu artık tek bir satırdır (Series)
     
-    # --- 1. VERİTABANINDAN KİLİT KONTROLÜ ---
+    # --- 1. KİLİT KONTROLÜ ---
     try:
-        # Hücre boşsa veya hatalıysa 0 kabul et
         raw_fails = user_row.get('failed_attempts', 0)
         if pd.isna(raw_fails) or str(raw_fails).strip() == '': fails = 0
         else: fails = int(float(str(raw_fails)))
     except: fails = 0
     
-    if fails >= 5: # 5 Hatalı denemede kilitle
+    if fails >= 5:
         log_audit_event("LOGIN_LOCKOUT", username, "Account locked (Database enforced)")
         return False, "LOCKED", None
 
     # --- 2. ŞİFRE KONTROLÜ ---
+    # Not: user_row tekil olduğu için doğrudan ['password'] ile erişiyoruz
     if check_password(user_row['password'], password):
-        # BAŞARILI: Sayacı sıfırla (Eğer daha önce hata yaptıysa)
+        # BAŞARILI: Sayacı sıfırla
         if fails > 0:
             users.at[row_idx, 'failed_attempts'] = 0
             conn.update(worksheet="Users", data=users)
             
-        # 2FA ve Diğer Kontroller
+        # 2FA ve Rol Bilgisi (DÜZELTİLEN KISIM BURASI)
+        # user_row zaten satırın kendisi olduğu için .iloc[0] KULLANMIYORUZ.
         is_2fa = clean_boolean(user_row.get('is_2fa_enabled', False))
-        role = user_row.iloc[0].get('role', 'User')
+        role = user_row.get('role', 'User') # .iloc[0] kaldırıldı
         
-        # Secret Decryption
         encrypted_secret = str(user_row.get('totp_secret', ''))
         decrypted_secret = decrypt_data(encrypted_secret)
         
@@ -278,10 +277,10 @@ def verify_login_step1(username, password):
         return True, "2FA_REQ" if is_2fa else "SUCCESS", user_data
     
     else:
-        # BAŞARISIZ: Veritabanındaki sayacı artır
+        # BAŞARISIZ
         new_fails = fails + 1
         users.at[row_idx, 'failed_attempts'] = new_fails
-        conn.update(worksheet="Users", data=users) # Kalıcı olarak kaydet
+        conn.update(worksheet="Users", data=users)
         
         log_audit_event("LOGIN_FAIL", username, f"Bad pass. Attempt {new_fails}/5")
         
