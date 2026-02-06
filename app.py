@@ -1,4 +1,24 @@
-# --- 1. EXAM DOMAIN MAPPINGS ---
+import streamlit as st
+from streamlit_gsheets import GSheetsConnection
+import pandas as pd
+import plotly.express as px
+from datetime import datetime
+import time
+import hashlib
+import secrets
+import re
+import urllib.parse
+import html
+import pyotp
+import qrcode
+from io import BytesIO
+from cryptography.fernet import Fernet
+
+# --- 1. CONFIGURATION (EN ÜSTE TAŞINDI) ---
+# Streamlit'te bu komut her zaman importlardan hemen sonra gelmelidir.
+st.set_page_config(page_title="CISSP AI Mentor", page_icon="🛡️", layout="wide")
+
+# --- 2. EXAM DOMAIN MAPPINGS ---
 CISSP_MAP = {
     "1": "Security and Risk Management",
     "2": "Asset Security",
@@ -17,13 +37,13 @@ CISM_MAP = {
     "4": "Information Security Incident Management"
 }
 
-# Varsayılan (Başlangıç)
+# Varsayılan Sınav Seçimi
 if 'selected_exam' not in st.session_state: st.session_state.selected_exam = 'CISSP'
+
+# Global Harita Tanımı
 TOPIC_MAP = CISSP_MAP if st.session_state.selected_exam == 'CISSP' else CISM_MAP
 
-# --- 2. CONFIGURATION & CSS ---
-st.set_page_config(page_title="CISSP AI Mentor", page_icon="🛡️", layout="wide")
-
+# --- 3. CSS STYLES ---
 st.markdown("""
     <style>
     .stApp { background-color: #f4f6f9; }
