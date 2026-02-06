@@ -863,9 +863,15 @@ elif st.session_state.view == 'Admin':
             except Exception as e: st.error(f"Error: {e}")
     with tab_logs:
         try:
+            # Audit_Logs sayfasını okumayı dene
             logs = conn.read(worksheet="Audit_Logs", ttl=0)
+            
             if not logs.empty:
-                # Sona eklenen en üstte görünsün
+                # Logları tersten sırala (En yeni en üstte)
                 st.dataframe(logs.sort_index(ascending=False), use_container_width=True)
-            else: st.info("No logs found.")
-        except: st.warning("Audit log sheet not found.")
+            else: 
+                st.info("Log file exists but is empty.")
+                
+        except Exception:
+            # Eğer sayfa henüz yoksa (Hiç olay yaşanmadıysa) hata verme, bilgi ver.
+            st.info("ℹ️ No audit logs found yet. The system will create the log file automatically after the first security event (e.g. Login, Logout).")
