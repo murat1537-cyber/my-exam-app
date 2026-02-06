@@ -174,8 +174,8 @@ def check_password(stored_password, input_password):
         return stored_password == input_password
 
 def get_all_users():
-    # 'is_premium' sütunu eklendi
-    cols = ["username", "email", "password", "is_2fa_enabled", "gdpr_consent", "role", "security_question", "security_answer", "totp_secret", "is_premium"]
+    # 'failed_attempts' sütunu eklendi
+    cols = ["username", "email", "password", "is_2fa_enabled", "gdpr_consent", "role", "security_question", "security_answer", "totp_secret", "is_premium", "failed_attempts"]
     try:
         df = conn.read(worksheet="Users", ttl=0)
         for col in cols: 
