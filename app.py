@@ -626,8 +626,26 @@ if st.session_state.view == 'Main':
                             if suc: st.success(msg)
                             else: st.error(msg)
     else: # Logged In Main
-        st.title("🛡️ CISSP Mentor Pro"); st.markdown(f"**Welcome, {st.session_state.current_user}!**")
-        dom = st.selectbox("Target Domain:", ["All Domains (Mix)"] + list(TOPIC_MAP.values()))
+        # --- SINAV SEÇİCİ (HEADER) ---
+        c_ex1, c_ex2 = st.columns([3, 1])
+        with c_ex1:
+            st.title(f"🛡️ {st.session_state.selected_exam} Mentor Pro")
+            st.markdown(f"**Welcome, {st.session_state.current_user}!** Ready to master {st.session_state.selected_exam}?")
+        with c_ex2:
+            # Sınav Değiştirme Butonu
+            exam_choice = st.radio("Select Exam:", ["CISSP", "CISM"], horizontal=True, 
+                                   index=0 if st.session_state.selected_exam == 'CISSP' else 1)
+            
+            # Eğer seçim değişirse state'i güncelle ve sayfayı yenile
+            if exam_choice != st.session_state.selected_exam:
+                st.session_state.selected_exam = exam_choice
+                st.rerun()
+
+        # Konu haritasını seçime göre güncelle
+        current_map = CISSP_MAP if st.session_state.selected_exam == 'CISSP' else CISM_MAP
+        
+        # Dropdown artık dinamik
+        dom = st.selectbox("Target Domain:", ["All Domains (Mix)"] + list(current_map.values()))
         c1, c2 = st.columns(2); c3, c4 = st.columns(2)
         with c1: 
             if st.button("⏱️ 10 Min Sprint", type="primary"): start_sprint('Time', 600, dom)
