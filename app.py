@@ -917,11 +917,16 @@ elif st.session_state.view == 'Admin':
     # AUDIT LOG TAB
     tab_sync, tab_logs = st.tabs(["Sync Questions", "Audit Logs"])
     with tab_sync:
-        up = st.file_uploader("Questions (.xlsx)", type=['xlsx'])
-        if up and st.button("Sync"):
+        st.info("Select which exam database you want to update.")
+        target_db = st.selectbox("Target Database", ["CISSP (Questions)", "CISM (Questions_CISM)"])
+        sheet_name = "Questions" if target_db.startswith("CISSP") else "Questions_CISM"
+        
+        up = st.file_uploader(f"Upload {sheet_name} Excel (.xlsx)", type=['xlsx'])
+        if up and st.button("Sync Data"):
             try:
-                c = conn.read(worksheet="Questions", ttl=0); n = pd.read_excel(up)
-                conn.update(worksheet="Questions", data=pd.concat([c, n], ignore_index=True)); st.success("Synced.")
+                c = conn.read(worksheet=sheet_name, ttl=0); n = pd.read_excel(up)
+                conn.update(worksheet=sheet_name, data=pd.concat([c, n], ignore_index=True))
+                st.success(f"Synced successfully to {sheet_name}!")
             except Exception as e: st.error(f"Error: {e}")
     with tab_logs:
         try:
