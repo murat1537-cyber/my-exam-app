@@ -649,6 +649,8 @@ elif st.session_state.view == 'Settings':
 
 elif st.session_state.view == 'Study' and st.session_state.smart_list is not None:
     if not st.session_state.is_logged_in: st.session_state.view='Main'; st.rerun()
+    
+    # --- ÜST MENÜ ---
     c_back, c_tm, c_ex = st.columns([1, 2, 1])
     with c_back:
         if st.session_state.q_idx > 0:
@@ -660,7 +662,31 @@ elif st.session_state.view == 'Study' and st.session_state.smart_list is not Non
             flush_stats_to_db() 
             st.session_state.is_sprint_active = False; st.session_state.view = 'Main'; st.rerun()
 
+    # --- FREEMIUM DUVARI (THE WALL) ---
+    # Eğer kullanıcı Premium değilse ve 5 soru çözdüyse durdur.
+    if not st.session_state.get('is_user_premium', False):
+        if st.session_state.sprint_total_attempted >= 5:
+            st.warning("🔒 Free Limit Reached (5 Questions)")
+            st.info("To continue practicing unlimited questions, please upgrade.")
+            
+            # BURAYA KENDİ ÖDEME LİNKİNİZİ KOYUN
+            # Şu an 'stripe.com' koydum ki hata vermesin.
+            st.markdown("""
+                <a href="https://stripe.com" target="_blank">
+                    <button style="background-color:#FF4B4B; color:white; border:none; padding:15px 32px; text-align:center; text-decoration:none; display:inline-block; font-size:16px; border-radius:12px; cursor:pointer; width:100%;">
+                        🚀 Upgrade to Premium ($19.99)
+                    </button>
+                </a>
+                """, unsafe_allow_html=True)
+            
+            if st.button("🏠 Return to Home", type="secondary", use_container_width=True):
+                flush_stats_to_db()
+                st.session_state.is_sprint_active = False; st.session_state.view = 'Main'; st.rerun()
+            st.stop() # Kodun geri kalanını (soruyu) gösterme!
+    # ----------------------------------
+
     end = False
+    # ... (Kod buradan aynen devam ediyor: if st.session_state.sprint_type == 'Time': ...)
     if st.session_state.sprint_type == 'Time':
         rem = max(0, int(st.session_state.sprint_target - (time.time() - st.session_state.start_time)))
         if rem <= 0: end = True
