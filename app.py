@@ -905,7 +905,7 @@ elif st.session_state.view == 'Score_Summary':
 elif st.session_state.view == 'Analytics':
     if not st.session_state.is_logged_in: st.session_state.view='Main'; st.rerun() 
     
-    # --- 1. SEÇİLİ SINAVA GÖRE AYARLARI YAP ---
+    # --- 1. SEÇİLİ SINAVA GÖRE VERİ HAZIRLIĞI ---
     exam = st.session_state.get('selected_exam', 'CISSP')
     target_sheet = "Questions" if exam == 'CISSP' else "Questions_CISM"
     current_map = CISSP_MAP if exam == 'CISSP' else CISM_MAP
@@ -917,40 +917,86 @@ elif st.session_state.view == 'Analytics':
         stats = conn.read(worksheet="User_Stats", ttl=0) 
         if not stats.empty: stats = stats[stats['user_id'] == st.session_state.current_user]
         
-        # HATA DÜZELTMESİ: Soruları seçili sınava göre çekiyoruz
         questions = conn.read(worksheet=target_sheet, ttl=3600)
         
         if not stats.empty and not questions.empty:
             stats['qid'] = stats['question_id'].astype(str).str.split('.').str[0]
             questions['qid'] = questions['id'].astype(str).str.split('.').str[0]
             
-            # Sadece bu sınavın sorularıyla eşleşen (Inner Join) istatistikleri al
+            # İç Birleştirme (Sadece seçili sınavın soruları)
             merged = pd.merge(stats, questions[['qid', 'topic_id']], on='qid', how='inner')
             
             if merged.empty:
                 st.info(f"No analytics data found for {exam} yet.")
             else:
-                # Domain isimlendirmesini seçili sınava (current_map) göre yap
+                # Veri İşleme
                 merged['Domain'] = merged['topic_id'].astype(str).str.split('.').str[0].map(current_map)
                 merged['is_correct_val'] = merged['is_correct'].apply(clean_boolean)
                 
+                # --- GRAFİKLER ---
                 k1, k2, k3 = st.columns(3)
-                k1.markdown(f'<div class="metric-card"><div class="metric-num">{len(merged)}</div><div class="metric-lbl">Total</div></div>', unsafe_allow_html=True)
-                k2.markdown(f'<div class="metric-card"><div class="metric-num">%{(merged["is_correct_val"].sum()/len(merged)*100):.1f}</div><div class="metric-lbl">Accuracy</div></div>', unsafe_allow_html=True)
-                k3.markdown(f'<div class="metric-card"><div class="metric-num">{merged["qid"].nunique()}</div><div class="metric-lbl">Unique Qs</div></div>', unsafe_allow_html=True)
+                k1.markdown(f'<div class="metric-card"><div class="metric-num">{len(merged)}</div><div class="metric-lbl">Total Questions</div></div>', unsafe_allow_html=True)
+                k2.markdown(f'<div class="metric-card"><div class="metric-num">%{(merged["is_correct_val"].sum()/len(merged)*100):.1f}</div><div class="metric-lbl">Overall Accuracy</div></div>', unsafe_allow_html=True)
+                k3.markdown(f'<div class="metric-card"><div class="metric-num">{merged["qid"].nunique()}</div><div class="metric-lbl">Unique Qs Solved</div></div>', unsafe_allow_html=True)
                 
-                st.write("---"); c1, c2 = st.columns([1,2])
-                merged['Result'] = merged['is_correct_val'].apply(lambda x: 'TRUE' if x == 1 else 'FALSE')
+                st.write("---")
+                c1, c2 = st.columns([1,2])
+                merged['Result'] = merged['is_correct_val'].apply(lambda x: 'Correct' if x == 1 else 'Wrong')
                 
                 with c1: 
-                    st.plotly_chart(px.pie(merged, names='Result', title="Success Ratio", color_discrete_map={'TRUE':'#198754','FALSE':'#dc3545'}), use_container_width=True)
+                    st.plotly_chart(px.pie(merged, names='Result', title="Success Distribution", color_discrete_map={'Correct':'#198754','Wrong':'#dc3545'}, hole=0.4), use_container_width=True)
+                
                 with c2: 
-                    # Domain Mastery Grafiği
+                    # Domain Mastery
                     perf = merged.groupby('Domain')['is_correct_val'].mean().reset_index()
                     perf['Acc'] = perf['is_correct_val']*100
-                    st.plotly_chart(px.bar(perf, x='Acc', y='Domain', orientation='h', title='Domain Mastery', color='Acc', color_continuous_scale='RdYlGn', range_x=[0,100]), use_container_width=True)
+                    st.plotly_chart(px.bar(perf, x='Acc', y='Domain', orientation='h', title='Domain Mastery (%)', color='Acc', color_continuous_scale='RdYlGn', range_x=[0,100]), use_container_width=True)
+                
+                # --- 🤖 YENİ: AI MENTOR ANALİZİ ---
+                st.write("---")
+                st.subheader("🤖 AI Mentor Analysis & Recommendations")
+                
+                # Analiz Hesaplamaları
+                weakest_domain = perf.sort_values('Acc').iloc[0]
+                strongest_domain = perf.sort_values('Acc', ascending=False).iloc[0]
+                
+                # Hata Sebeplerini Analiz Et
+                wrong_answers = merged[merged['is_correct_val'] == False]
+                if not wrong_answers.empty:
+                    # 'None' olmayan hata sebeplerini say
+                    error_counts = wrong_answers[wrong_answers['error_reason'] != 'None']['error_reason'].value_counts()
+                    primary_issue = error_counts.index[0] if not error_counts.empty else "General"
+                else:
+                    primary_issue = "None"
+
+                # Tavsiye Mesajı Oluştur (Chat Arayüzü ile)
+                with st.chat_message("assistant", avatar="🛡️"):
+                    st.write(f"Hello **{st.session_state.current_user}**, I've analyzed your performance data. Here is your personalized strategy:")
+                    
+                    # 1. Zayıf Nokta Analizi
+                    st.markdown(f"**📉 Priority Focus Area:**")
+                    st.info(f"Your weakest domain is **{weakest_domain['Domain']}** with **{weakest_domain['Acc']:.1f}%** accuracy. You should prioritize reviewing this chapter in your study guide immediately.")
+                    
+                    # 2. Hata Tipi Analizi
+                    st.markdown(f"**🔍 Error Pattern Detection:**")
+                    if primary_issue == "Knowledge Gap":
+                        st.warning("I detected frequent **'Knowledge Gaps'**. This means you are often guessing or don't know the core concept. **Recommendation:** Stop solving questions for 1 day and focus solely on reading/watching lectures.")
+                    elif primary_issue == "Attention":
+                        st.warning("I detected frequent **'Attention Errors'**. You know the topic but miss keywords like 'NOT', 'BEST', 'MOST'. **Recommendation:** Slow down. Read each question twice before looking at the options.")
+                    elif primary_issue == "Interpretation":
+                        st.warning("I detected **'Logic/Interpretation'** issues. You are eliminating options but picking the distractor. **Recommendation:** Focus on the 'CISSP Mindset' (Think like a Manager, not a Tech).")
+                    else:
+                        st.success("Your error patterns are balanced. Keep practicing to build muscle memory.")
+                    
+                    # 3. Genel Motivasyon
+                    if strongest_domain['Acc'] > 85:
+                        st.markdown(f"**🌟 Strength:** You are dominating **{strongest_domain['Domain']}**! Great job.")
+                    
+                    if len(merged) < 30:
+                        st.caption("⚠️ *Note: You have solved fewer than 30 questions. Solve more to make this analysis more accurate.*")
+
         else: 
-            st.info("No data available yet. Start solving questions to see analytics!")
+            st.info("No data available yet. Start solving questions to populate the dashboard!")
             
     except Exception as e: st.error(f"Analytics Error: {str(e)}")
 
