@@ -365,24 +365,38 @@ def prepare_sprint_data(dom):
     return q
 
 def start_sprint(m_type, val, dom):
-    # --- 1. KULLANICI PREMIUM MU KONTROL ET ---
+    # --- 1. KULLANICI PREMIUM MU KONTROL ET (DÜZELTİLDİ) ---
     users = get_all_users()
+    # Kullanıcıyı bul
     user_row = users[users['username'].astype(str).str.strip() == st.session_state.current_user]
+    
     is_premium = False
     if not user_row.empty:
+        # HATA DÜZELTMESİ: Veriyi clean_boolean ile okuyoruz.
+        # Bu sayede 1, 1.0, TRUE, True, YES hepsini kabul eder.
         raw_val = user_row.iloc[0].get('is_premium', 'FALSE')
-        is_premium = str(raw_val).strip().upper() in ['TRUE', '1', 'YES', 'ON']
+        is_premium = clean_boolean(raw_val)
     
-    # Durumu hafızaya kaydet (Sınav esnasında sürekli veritabanına bakmamak için)
+    # Durumu hafızaya kaydet
     st.session_state.is_user_premium = is_premium
 
-    # --- 2. SADECE MOCK EXAM'I BAŞTAN KİLİTLE ---
-    if m_type == 'Mock' and not is_premium:
-        st.error("🔒 The Full Mock Exam (3 Hours) is for PREMIUM members only.")
-        st.info("Free users can try the other modes (limited to 5 questions).")
-        # Linki güncelledim (Örnek Stripe Anasayfası)
-        st.markdown("[👉 Upgrade Now](https://stripe.com)", unsafe_allow_html=True) 
-        return
+    # --- 2. KISITLAMALARI UYGULA ---
+    if not is_premium:
+        # Eğer kullanıcı Premium DEĞİLSE ve:
+        # a) Mock Exam (Deneme) açmaya çalışıyorsa
+        # b) VEYA 10 Soru / Zamanlı modda 5 sorudan fazlasını seçtiyse (val > 5)
+        if m_type == 'Mock' or (m_type != 'Mock' and val > 5):
+            st.error("🔒 The Full Mock Exam and Unlimited Practice are for PREMIUM members only.")
+            st.info("Free users are limited to 5 questions per session.")
+            st.markdown("""
+                <a href="https://stripe.com" target="_blank">
+                    <button style="background-color:#FF4B4B; color:white; border:none; padding:10px 20px; font-size:16px; border-radius:8px; cursor:pointer;">
+                        🚀 Upgrade Now
+                    </button>
+                </a>
+                """, unsafe_allow_html=True)
+            return
+    # --------------------------------
 
     q = prepare_sprint_data(dom)
     if q.empty: st.error("No questions."); return
