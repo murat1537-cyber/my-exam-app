@@ -905,30 +905,55 @@ elif st.session_state.view == 'Score_Summary':
 
 elif st.session_state.view == 'Analytics':
     if not st.session_state.is_logged_in: st.session_state.view='Main'; st.rerun() 
-    st.header("📊 Intelligence Dashboard")
+    
+    # --- 1. SEÇİLİ SINAVA GÖRE AYARLARI YAP ---
+    exam = st.session_state.get('selected_exam', 'CISSP')
+    target_sheet = "Questions" if exam == 'CISSP' else "Questions_CISM"
+    current_map = CISSP_MAP if exam == 'CISSP' else CISM_MAP
+    
+    st.header(f"📊 {exam} Intelligence Dashboard")
+    
     try:
+        # İstatistikleri Çek
         stats = conn.read(worksheet="User_Stats", ttl=0) 
         if not stats.empty: stats = stats[stats['user_id'] == st.session_state.current_user]
-        questions = conn.read(worksheet="Questions", ttl=3600)
+        
+        # HATA DÜZELTMESİ: Soruları seçili sınava göre çekiyoruz
+        questions = conn.read(worksheet=target_sheet, ttl=3600)
+        
         if not stats.empty and not questions.empty:
-            stats['qid'] = stats['question_id'].astype(str).str.split('.').str[0]; questions['qid'] = questions['id'].astype(str).str.split('.').str[0]
-            merged = pd.merge(stats, questions[['qid', 'topic_id']], on='qid')
-            merged['Domain'] = merged['topic_id'].astype(str).str.split('.').str[0].map(TOPIC_MAP)
-            merged['is_correct_val'] = merged['is_correct'].apply(clean_boolean)
+            stats['qid'] = stats['question_id'].astype(str).str.split('.').str[0]
+            questions['qid'] = questions['id'].astype(str).str.split('.').str[0]
             
-            k1, k2, k3 = st.columns(3)
-            k1.markdown(f'<div class="metric-card"><div class="metric-num">{len(merged)}</div><div class="metric-lbl">Total</div></div>', unsafe_allow_html=True)
-            k2.markdown(f'<div class="metric-card"><div class="metric-num">%{(merged["is_correct_val"].sum()/len(merged)*100):.1f}</div><div class="metric-lbl">Accuracy</div></div>', unsafe_allow_html=True)
-            k3.markdown(f'<div class="metric-card"><div class="metric-num">{merged["qid"].nunique()}</div><div class="metric-lbl">Unique Qs</div></div>', unsafe_allow_html=True)
+            # Sadece bu sınavın sorularıyla eşleşen (Inner Join) istatistikleri al
+            merged = pd.merge(stats, questions[['qid', 'topic_id']], on='qid', how='inner')
             
-            st.write("---"); c1, c2 = st.columns([1,2])
-            merged['Result'] = merged['is_correct_val'].apply(lambda x: 'TRUE' if x == 1 else 'FALSE')
-            with c1: st.plotly_chart(px.pie(merged, names='Result', title="Ratio", color_discrete_map={'TRUE':'#198754','FALSE':'#dc3545'}), use_container_width=True)
-            with c2: 
-                perf = merged.groupby('Domain')['is_correct_val'].mean().reset_index(); perf['Acc'] = perf['is_correct_val']*100
-                st.plotly_chart(px.bar(perf, x='Acc', y='Domain', orientation='h', title='Domain Mastery', color='Acc', color_continuous_scale='RdYlGn'), use_container_width=True)
-        else: st.info("No data.")
-    except Exception as e: st.error(str(e))
+            if merged.empty:
+                st.info(f"No analytics data found for {exam} yet.")
+            else:
+                # Domain isimlendirmesini seçili sınava (current_map) göre yap
+                merged['Domain'] = merged['topic_id'].astype(str).str.split('.').str[0].map(current_map)
+                merged['is_correct_val'] = merged['is_correct'].apply(clean_boolean)
+                
+                k1, k2, k3 = st.columns(3)
+                k1.markdown(f'<div class="metric-card"><div class="metric-num">{len(merged)}</div><div class="metric-lbl">Total</div></div>', unsafe_allow_html=True)
+                k2.markdown(f'<div class="metric-card"><div class="metric-num">%{(merged["is_correct_val"].sum()/len(merged)*100):.1f}</div><div class="metric-lbl">Accuracy</div></div>', unsafe_allow_html=True)
+                k3.markdown(f'<div class="metric-card"><div class="metric-num">{merged["qid"].nunique()}</div><div class="metric-lbl">Unique Qs</div></div>', unsafe_allow_html=True)
+                
+                st.write("---"); c1, c2 = st.columns([1,2])
+                merged['Result'] = merged['is_correct_val'].apply(lambda x: 'TRUE' if x == 1 else 'FALSE')
+                
+                with c1: 
+                    st.plotly_chart(px.pie(merged, names='Result', title="Success Ratio", color_discrete_map={'TRUE':'#198754','FALSE':'#dc3545'}), use_container_width=True)
+                with c2: 
+                    # Domain Mastery Grafiği
+                    perf = merged.groupby('Domain')['is_correct_val'].mean().reset_index()
+                    perf['Acc'] = perf['is_correct_val']*100
+                    st.plotly_chart(px.bar(perf, x='Acc', y='Domain', orientation='h', title='Domain Mastery', color='Acc', color_continuous_scale='RdYlGn', range_x=[0,100]), use_container_width=True)
+        else: 
+            st.info("No data available yet. Start solving questions to see analytics!")
+            
+    except Exception as e: st.error(f"Analytics Error: {str(e)}")
 
 elif st.session_state.view == 'Admin':
     if st.session_state.user_role != 'Admin': st.session_state.view = 'Main'; st.rerun()
