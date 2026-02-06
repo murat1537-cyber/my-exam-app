@@ -388,10 +388,24 @@ def get_user_rank(df):
     return "👑 CISO Master", c
 
 def prepare_sprint_data(dom):
-    q = conn.read(worksheet="Questions", ttl=3600)
+    # Seçili sınava göre doğru sayfayı ve konuları belirle
+    exam = st.session_state.get('selected_exam', 'CISSP')
+    target_sheet = "Questions" if exam == 'CISSP' else "Questions_CISM"
+    current_map = CISSP_MAP if exam == 'CISSP' else CISM_MAP
+    
+    # İlgili sayfadan soruları çek
+    try:
+        q = conn.read(worksheet=target_sheet, ttl=0) # Anlık değişim için ttl=0
+    except:
+        st.error(f"Sheet '{target_sheet}' not found. Please create it in Google Sheets.")
+        return pd.DataFrame()
+
     if dom != "All Domains (Mix)":
-        tid = [k for k, v in TOPIC_MAP.items() if v == dom][0]
-        q = q[q['topic_id'].astype(str).str.split('.').str[0] == tid]
+        # Domain ismine göre ID'yi bul (Tersine arama)
+        tid = [k for k, v in current_map.items() if v == dom]
+        if tid:
+            q = q[q['topic_id'].astype(str).str.split('.').str[0] == tid[0]]
+            
     return q
 
 def start_sprint(m_type, val, dom):
