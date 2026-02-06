@@ -213,32 +213,67 @@ def register_new_user(username, email, password, gdpr, sec_q, sec_a):
     return True, "Created! You can enable 2FA in Settings."
 
 def verify_login_step1(username, password):
-    if st.session_state.failed_login_attempts >= 5: 
-        log_audit_event("LOGIN_LOCKOUT", username, "Max attempts reached")
-        return False, "LOCKED", None
-    
     users = get_all_users()
     if users.empty: return False, "INVALID", None
     
-    user_rec = users[users['username'].astype(str).str.strip() == str(username).strip()]
-    if not user_rec.empty:
-        if check_password(user_rec.iloc[0]['password'], password):
-            is_2fa = clean_boolean(user_rec.iloc[0].get('is_2fa_enabled', False))
-            role = user_rec.iloc[0].get('role', 'User')
-            
-            # GÜVENLİK: Secret'ı veritabanından okurken DECRYPT et
-            encrypted_secret = str(user_rec.iloc[0].get('totp_secret', ''))
-            decrypted_secret = decrypt_data(encrypted_secret)
-            
-            user_data = {
-                'username': str(username).strip(),
-                'role': str(role).strip() if pd.notna(role) else 'User',
-                'secret': decrypted_secret # Şifresi çözülmüş secret
-            }
-            return True, "2FA_REQ" if is_2fa else "SUCCESS", user_data
+    # Kullanıcıyı bul
+    idx = users.index[users['username'].astype(str).str.strip() == str(username).strip()].tolist()
     
-    log_audit_event("LOGIN_FAIL", username, "Invalid credentials")            
-    return False, "INVALID", None
+    if not idx:
+        # Kullanıcı yoksa sahte bir gecikme yap (Güvenlik: Timing Attack önleme)
+        time.sleep(0.5) 
+        log_audit_event("LOGIN_FAIL", username, "User not found")
+        return False, "INVALID", None
+        
+    row_idx = idx[0]
+    user_row = users.iloc[row_idx]
+    
+    # --- 1. VERİTABANINDAN KİLİT KONTROLÜ ---
+    try:
+        # Hücre boşsa veya hatalıysa 0 kabul et
+        raw_fails = user_row.get('failed_attempts', 0)
+        if pd.isna(raw_fails) or str(raw_fails).strip() == '': fails = 0
+        else: fails = int(float(str(raw_fails)))
+    except: fails = 0
+    
+    if fails >= 5: # 5 Hatalı denemede kilitle
+        log_audit_event("LOGIN_LOCKOUT", username, "Account locked (Database enforced)")
+        return False, "LOCKED", None
+
+    # --- 2. ŞİFRE KONTROLÜ ---
+    if check_password(user_row['password'], password):
+        # BAŞARILI: Sayacı sıfırla (Eğer daha önce hata yaptıysa)
+        if fails > 0:
+            users.at[row_idx, 'failed_attempts'] = 0
+            conn.update(worksheet="Users", data=users)
+            
+        # 2FA ve Diğer Kontroller
+        is_2fa = clean_boolean(user_row.get('is_2fa_enabled', False))
+        role = user_row.iloc[0].get('role', 'User')
+        
+        # Secret Decryption
+        encrypted_secret = str(user_row.get('totp_secret', ''))
+        decrypted_secret = decrypt_data(encrypted_secret)
+        
+        user_data = {
+            'username': str(username).strip(),
+            'role': str(role).strip() if pd.notna(role) else 'User',
+            'secret': decrypted_secret
+        }
+        return True, "2FA_REQ" if is_2fa else "SUCCESS", user_data
+    
+    else:
+        # BAŞARISIZ: Veritabanındaki sayacı artır
+        new_fails = fails + 1
+        users.at[row_idx, 'failed_attempts'] = new_fails
+        conn.update(worksheet="Users", data=users) # Kalıcı olarak kaydet
+        
+        log_audit_event("LOGIN_FAIL", username, f"Bad pass. Attempt {new_fails}/5")
+        
+        if new_fails >= 5:
+            return False, "LOCKED", None
+        else:
+            return False, "INVALID", None
 
 def verify_totp_code(secret, code):
     if not secret or len(secret) < 16: return False 
