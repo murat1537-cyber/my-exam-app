@@ -799,20 +799,17 @@ elif st.session_state.view == 'Study' and st.session_state.smart_list is not Non
         curr = st.session_state.smart_list.iloc[st.session_state.q_idx]
         st.markdown(f"""<div class="q-card"><h3>{html.escape(curr["content_text"])}</h3></div>""", unsafe_allow_html=True)
         
-        # --- AI DESTEK ALANI (DÜZELTİLMİŞ HALİ) ---
+      # --- AI DESTEK ALANI (KOPYALA BUTONLU) ---
         with st.expander("💡 🤖 Need a Hint? (AI & Search Tools)"):
-            # 1. Google Araması için Soru + Şıklar Metni Hazırla
+            # 1. Google Araması Hazırlığı
             q_text_raw = curr["content_text"]
-            # Şıkları tek satırda birleştir
             options_inline = f"A) {curr['option_a']} B) {curr['option_b']} C) {curr['option_c']} D) {curr['option_d']}"
             
-            # Google'a gidecek tam metin: Soru + Şıklar + Anahtar Kelime
             search_str = f"{q_text_raw} {options_inline} CISSP explanation"
             enc_q = urllib.parse.quote(search_str)
             
             c_h1, c_h2 = st.columns([1, 1])
             with c_h1:
-                # Google Linki
                 st.markdown(f"""
                 <a href="https://www.google.com/search?q={enc_q}" target="_blank" style="text-decoration:none;">
                     <div class="ai-btn">🌐 Search on Google (w/ Options)</div>
@@ -820,7 +817,7 @@ elif st.session_state.view == 'Study' and st.session_state.smart_list is not Non
                 """, unsafe_allow_html=True)
             
             with c_h2:
-                # 2. ChatGPT için Prompt Hazırla (Alt alta düzenli format)
+                # 2. ChatGPT Prompt Hazırlığı
                 prompt = f"""Act as a CISSP expert. Analyze this question.
 Explain why the correct answer is the best choice, and why the other options are incorrect.
 
@@ -833,9 +830,11 @@ B) {curr['option_b']}
 C) {curr['option_c']}
 D) {curr['option_d']}"""
                 
-                st.text_area("📋 Copy Prompt for ChatGPT/Claude:", value=prompt, height=200)
+                # GÜNCELLEME: st.text_area yerine st.code kullanıldı.
+                # Bu sayede sağ üstte otomatik "Kopyala" ikonu çıkacak.
+                st.markdown("**📋 Copy Prompt for ChatGPT:**")
+                st.code(prompt, language="markdown")
         # -------------------------------------------------------
-
         c1, c2 = st.columns(2)
         opts = [('A', 'option_a'), ('B', 'option_b'), ('C', 'option_c'), ('D', 'option_d')]
         for i, (cd, cl) in enumerate(opts):
