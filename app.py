@@ -16,7 +16,9 @@ from cryptography.fernet import Fernet
 
 # --- 1. CONFIGURATION (EN ÜSTE TAŞINDI) ---
 # Streamlit'te bu komut her zaman importlardan hemen sonra gelmelidir.
-st.set_page_config(page_title="CISSP AI Mentor", page_icon="🛡️", layout="wide")
+# ESKİ: page_title="CISSP AI Mentor"
+# YENİ: page_title="Cyber Mentor Pro"
+st.set_page_config(page_title="Cyber Mentor Pro", page_icon="🛡️", layout="wide")
 
 # --- 2. EXAM DOMAIN MAPPINGS ---
 CISSP_MAP = {
