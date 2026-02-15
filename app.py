@@ -1024,9 +1024,11 @@ elif st.session_state.view == 'Analytics':
 
 elif st.session_state.view == 'Admin':
     if st.session_state.user_role != 'Admin': st.session_state.view = 'Main'; st.rerun()
-    st.subheader("💾 Admin Sync")
-    # AUDIT LOG TAB
-    tab_sync, tab_logs = st.tabs(["Sync Questions", "Audit Logs"])
+    st.subheader("💾 Admin Console")
+    
+    # 3 TAB OLACAK ŞEKİLDE GÜNCELLENDİ
+    tab_sync, tab_logs, tab_backup = st.tabs(["Sync Questions", "Audit Logs", "📦 Backup Data"])
+    
     with tab_sync:
         st.info("Select which exam database you want to update.")
         target_db = st.selectbox("Target Database", ["CISSP (Questions)", "CISM (Questions_CISM)"])
@@ -1039,17 +1041,52 @@ elif st.session_state.view == 'Admin':
                 conn.update(worksheet=sheet_name, data=pd.concat([c, n], ignore_index=True))
                 st.success(f"Synced successfully to {sheet_name}!")
             except Exception as e: st.error(f"Error: {e}")
+            
     with tab_logs:
         try:
-            # Audit_Logs sayfasını okumayı dene
             logs = conn.read(worksheet="Audit_Logs", ttl=0)
-            
             if not logs.empty:
-                # Logları tersten sırala (En yeni en üstte)
                 st.dataframe(logs.sort_index(ascending=False), use_container_width=True)
             else: 
                 st.info("Log file exists but is empty.")
-                
         except Exception:
-            # Eğer sayfa henüz yoksa (Hiç olay yaşanmadıysa) hata verme, bilgi ver.
-            st.info("ℹ️ No audit logs found yet. The system will create the log file automatically after the first security event (e.g. Login, Logout).")
+            st.info("ℹ️ No audit logs found yet.")
+
+    # --- YENİ EKLENEN YEDEKLEME TABI ---
+    with tab_backup:
+        st.markdown("### 📥 Download Full Database Backup")
+        st.info("This will download all worksheets (Users, Stats, Questions, Logs) as a single Excel file.")
+        
+        if st.button("Generate Backup File"):
+            try:
+                # Tüm sayfaları hafızaya çek
+                with st.spinner("Reading all data from Google Sheets..."):
+                    df_users = conn.read(worksheet="Users", ttl=0)
+                    df_stats = conn.read(worksheet="User_Stats", ttl=0)
+                    df_logs = conn.read(worksheet="Audit_Logs", ttl=0)
+                    df_q_cissp = conn.read(worksheet="Questions", ttl=0)
+                    # CISM sayfası yoksa hata vermesin diye try-except ile çekelim
+                    try: df_q_cism = conn.read(worksheet="Questions_CISM", ttl=0)
+                    except: df_q_cism = pd.DataFrame()
+
+                # Excel dosyasını RAM'de oluştur (Diske kaydetmeden)
+                buffer = BytesIO()
+                with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
+                    df_users.to_excel(writer, sheet_name='Users', index=False)
+                    df_stats.to_excel(writer, sheet_name='User_Stats', index=False)
+                    df_logs.to_excel(writer, sheet_name='Audit_Logs', index=False)
+                    df_q_cissp.to_excel(writer, sheet_name='Questions', index=False)
+                    if not df_q_cism.empty:
+                        df_q_cism.to_excel(writer, sheet_name='Questions_CISM', index=False)
+                
+                # İndirme Butonunu Göster
+                st.download_button(
+                    label="⬇️ Click to Download Backup.xlsx",
+                    data=buffer.getvalue(),
+                    file_name=f"CyberMentor_Backup_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                    mime="application/vnd.ms-excel"
+                )
+                st.success("Backup generated! Click the button above to save.")
+                
+            except Exception as e:
+                st.error(f"Backup failed: {e}")
