@@ -564,8 +564,8 @@ if st.session_state.view == 'Main':
 
         c1, c2, c3 = st.columns([1, 1.5, 1])
         with c2:
-            st.markdown("""<div class="login-wrapper"><div style="font-size: 50px;">🛡️</div><div class="login-title">CISSP Mentor Pro</div><div class="login-subtitle">Your AI-Powered Certification Partner</div></div>""", unsafe_allow_html=True)
-            
+            # "CISSP Mentor Pro" yerine "Cyber Mentor Pro" yazıldı.
+            st.markdown("""<div class="login-wrapper"><div style="font-size: 50px;">🛡️</div><div class="login-title">Cyber Mentor Pro</div><div class="login-subtitle">Your AI-Powered Certification Partner</div></div>""", unsafe_allow_html=True)            
             # --- DURUM 1: KURTARMA EKRANI AKTİFSE ---
             if st.session_state.show_recovery:
                 st.markdown("### 🔄 Account Recovery")
