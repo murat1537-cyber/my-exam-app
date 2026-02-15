@@ -1055,12 +1055,52 @@ elif st.session_state.view == 'Admin':
     with tab_logs:
         try:
             logs = conn.read(worksheet="Audit_Logs", ttl=0)
+            
             if not logs.empty:
-                st.dataframe(logs.sort_index(ascending=False), use_container_width=True)
+                st.markdown("### 🕵️ Audit Integrity Monitor")
+                
+                # --- INTEGRITY CHECK (VERİ BÜTÜNLÜĞÜ KONTROLÜ) ---
+                # Her satırı kontrol et: Hash tutuyor mu?
+                def verify_log(row):
+                    try:
+                        # Kayıtlı Hash
+                        stored_hash = str(row.get('checksum', ''))
+                        
+                        # Olması Gereken Hash (Yeniden Hesapla)
+                        # Not: timestamp string formatı önemli, birebir aynı olmalı
+                        ts = str(row['timestamp'])
+                        # Secret key'i de hesaba katıyoruz ki dışarıdan biri hash üretemesin
+                        raw = f"{ts}|{row['event_type']}|{row['username']}|{row['details']}|{st.secrets['general']['encryption_key']}"
+                        calculated_hash = hashlib.sha256(raw.encode()).hexdigest()
+                        
+                        if stored_hash == calculated_hash:
+                            return "✅ Valid"
+                        else:
+                            return "❌ CORRUPTED" # Biri elle değiştirmiş!
+                    except:
+                        return "⚠️ Unknown"
+
+                # Kontrol sütununu ekle
+                # (Eski loglarda checksum sütunu boşsa 'Unknown' yazar, yenilerde çalışır)
+                if 'checksum' in logs.columns:
+                    logs['Integrity Status'] = logs.apply(verify_log, axis=1)
+                    
+                    # Gösterim için sütun sırasını ayarla (En başa durumu koy)
+                    cols = ['Integrity Status', 'timestamp', 'event_type', 'username', 'details']
+                    st.dataframe(logs[cols].sort_index(ascending=False), use_container_width=True)
+                    
+                    # Eğer bozulmuş log varsa uyarı ver
+                    if "❌ CORRUPTED" in logs['Integrity Status'].values:
+                        st.error("🚨 SECURITY ALERT: Some logs have been tampered with! The database integrity is compromised.")
+                else:
+                    st.warning("Old log format detected. Integrity check will active for new logs.")
+                    st.dataframe(logs.sort_index(ascending=False), use_container_width=True)
+
             else: 
                 st.info("Log file exists but is empty.")
-        except Exception:
-            st.info("ℹ️ No audit logs found yet.")
+                
+        except Exception as e:
+            st.info(f"Log Error: {e}")
 
     # --- YENİ EKLENEN YEDEKLEME TABI ---
     with tab_backup:
