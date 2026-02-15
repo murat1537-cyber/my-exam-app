@@ -636,11 +636,33 @@ if st.session_state.view == 'Main':
 
                 with tab2:
                     st.write("")
-                    with st.form("s_form"):
-                        u = st.text_input("Username"); e = st.text_input("Email"); p = st.text_input("Password", type="password")
-                        st.markdown("---"); q = st.selectbox("Security Question", SECURITY_QUESTIONS); a = st.text_input("Answer")
-                        g = st.checkbox("GDPR Consent")
-                        if st.form_submit_button("Sign Up", type="secondary", use_container_width=True):
+                    with tab_signup: # (Eğer kodunda with tab2 ise orayı değiştir)
+                st.write("")
+                with st.form("s_form"):
+                    st.markdown("##### Create New Account")
+                    u = st.text_input("Username"); e = st.text_input("Email"); p = st.text_input("Password", type="password")
+                    st.markdown("---"); q = st.selectbox("Security Question", SECURITY_QUESTIONS); a = st.text_input("Answer")
+                    
+                    st.write("")
+                    # --- YENİ EKLENEN GİZLİLİK BİLDİRİMİ ---
+                    with st.expander("📜 Read Privacy Policy (Gizlilik Bildirimi)"):
+                        st.markdown("""
+                        **Privacy Statement (Privacyverklaring)**
+                        
+                        1. **Data Collection:** We collect your username, email address, and encrypted password solely for authentication purposes. We also store your quiz performance data to generate analytics.
+                        2. **Storage:** Your data is stored securely in a private Google Sheets database. Passwords are hashed (SHA-256) and never stored in plain text.
+                        3. **Usage:** We do not share your data with third parties or use it for advertising. It is used strictly to provide the exam simulation service.
+                        4. **Your Rights:** Under GDPR (AVG), you have the right to request a copy of your data or request complete deletion of your account.
+                        5. **Contact:** To exercise your rights, please contact the administrator.
+                        """)
+                    
+                    # Checkbox metnini daha hukuki yaptik
+                    g = st.checkbox("I have read and accept the Privacy Policy")
+                    
+                    if st.form_submit_button("Sign Up", type="secondary", use_container_width=True):
+                        if not g:
+                            st.error("⚠️ You must accept the Privacy Policy to register.")
+                        else:
                             suc, msg = register_new_user(u, e, p, g, q, a)
                             if suc: st.success(msg)
                             else: st.error(msg)
