@@ -819,9 +819,9 @@ elif st.session_state.view == 'Study' and st.session_state.smart_list is not Non
         curr = st.session_state.smart_list.iloc[st.session_state.q_idx]
         st.markdown(f"""<div class="q-card"><h3>{html.escape(curr["content_text"])}</h3></div>""", unsafe_allow_html=True)
         
-      # --- AI DESTEK ALANI (KOPYALA BUTONLU) ---
+      # --- AI ASSISTANCE AREA (WITH COPY BUTTON) ---
         with st.expander("💡 🤖 Need a Hint? (AI & Search Tools)"):
-            # 1. Google Araması Hazırlığı
+            # 1. Prepare Google Search Link
             q_text_raw = curr["content_text"]
             options_inline = f"A) {curr['option_a']} B) {curr['option_b']} C) {curr['option_c']} D) {curr['option_d']}"
             
@@ -837,7 +837,7 @@ elif st.session_state.view == 'Study' and st.session_state.smart_list is not Non
                 """, unsafe_allow_html=True)
             
             with c_h2:
-                # 2. ChatGPT Prompt Hazırlığı
+                # 2. Prepare ChatGPT Prompt
                 prompt = f"""Act as a CISSP expert. Analyze this question.
 Explain why the correct answer is the best choice, and why the other options are incorrect.
 
@@ -850,8 +850,8 @@ B) {curr['option_b']}
 C) {curr['option_c']}
 D) {curr['option_d']}"""
                 
-                # GÜNCELLEME: st.text_area yerine st.code kullanıldı.
-                # Bu sayede sağ üstte otomatik "Kopyala" ikonu çıkacak.
+                # UPDATE: Used st.code instead of st.text_area.
+                # This automatically provides a "Copy" icon in the top right corner.
                 st.markdown("**📋 Copy Prompt for ChatGPT:**")
                 st.code(prompt, language="markdown")
         # -------------------------------------------------------
