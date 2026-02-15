@@ -634,33 +634,13 @@ if st.session_state.view == 'Main':
                                         st.error("❌ Invalid Code")
                             if st.button("Cancel Login"): st.session_state.login_step = 'credentials'; st.session_state.temp_user_data = None; st.rerun()
 
-                with tab_signup: # (Eğer kodunda with tab2 ise orayı değiştir)
-                st.write("")
-                with st.form("s_form"):
-                    st.markdown("##### Create New Account")
-                    u = st.text_input("Username"); e = st.text_input("Email"); p = st.text_input("Password", type="password")
-                    st.markdown("---"); q = st.selectbox("Security Question", SECURITY_QUESTIONS); a = st.text_input("Answer")
-                    
+                with tab2:
                     st.write("")
-                    # --- YENİ EKLENEN GİZLİLİK BİLDİRİMİ ---
-                    with st.expander("📜 Read Privacy Policy (Gizlilik Bildirimi)"):
-                        st.markdown("""
-                        **Privacy Statement (Privacyverklaring)**
-                        
-                        1. **Data Collection:** We collect your username, email address, and encrypted password solely for authentication purposes. We also store your quiz performance data to generate analytics.
-                        2. **Storage:** Your data is stored securely in a private Google Sheets database. Passwords are hashed (SHA-256) and never stored in plain text.
-                        3. **Usage:** We do not share your data with third parties or use it for advertising. It is used strictly to provide the exam simulation service.
-                        4. **Your Rights:** Under GDPR (AVG), you have the right to request a copy of your data or request complete deletion of your account.
-                        5. **Contact:** To exercise your rights, please contact the administrator.
-                        """)
-                    
-                    # Checkbox metnini daha hukuki yaptik
-                    g = st.checkbox("I have read and accept the Privacy Policy")
-                    
-                    if st.form_submit_button("Sign Up", type="secondary", use_container_width=True):
-                        if not g:
-                            st.error("⚠️ You must accept the Privacy Policy to register.")
-                        else:
+                    with st.form("s_form"):
+                        u = st.text_input("Username"); e = st.text_input("Email"); p = st.text_input("Password", type="password")
+                        st.markdown("---"); q = st.selectbox("Security Question", SECURITY_QUESTIONS); a = st.text_input("Answer")
+                        g = st.checkbox("GDPR Consent")
+                        if st.form_submit_button("Sign Up", type="secondary", use_container_width=True):
                             suc, msg = register_new_user(u, e, p, g, q, a)
                             if suc: st.success(msg)
                             else: st.error(msg)
@@ -819,9 +799,9 @@ elif st.session_state.view == 'Study' and st.session_state.smart_list is not Non
         curr = st.session_state.smart_list.iloc[st.session_state.q_idx]
         st.markdown(f"""<div class="q-card"><h3>{html.escape(curr["content_text"])}</h3></div>""", unsafe_allow_html=True)
         
-      # --- AI ASSISTANCE AREA (WITH COPY BUTTON) ---
+      # --- AI DESTEK ALANI (KOPYALA BUTONLU) ---
         with st.expander("💡 🤖 Need a Hint? (AI & Search Tools)"):
-            # 1. Prepare Google Search Link
+            # 1. Google Araması Hazırlığı
             q_text_raw = curr["content_text"]
             options_inline = f"A) {curr['option_a']} B) {curr['option_b']} C) {curr['option_c']} D) {curr['option_d']}"
             
@@ -837,7 +817,7 @@ elif st.session_state.view == 'Study' and st.session_state.smart_list is not Non
                 """, unsafe_allow_html=True)
             
             with c_h2:
-                # 2. Prepare ChatGPT Prompt
+                # 2. ChatGPT Prompt Hazırlığı
                 prompt = f"""Act as a CISSP expert. Analyze this question.
 Explain why the correct answer is the best choice, and why the other options are incorrect.
 
@@ -850,8 +830,8 @@ B) {curr['option_b']}
 C) {curr['option_c']}
 D) {curr['option_d']}"""
                 
-                # UPDATE: Used st.code instead of st.text_area.
-                # This automatically provides a "Copy" icon in the top right corner.
+                # GÜNCELLEME: st.text_area yerine st.code kullanıldı.
+                # Bu sayede sağ üstte otomatik "Kopyala" ikonu çıkacak.
                 st.markdown("**📋 Copy Prompt for ChatGPT:**")
                 st.code(prompt, language="markdown")
         # -------------------------------------------------------
