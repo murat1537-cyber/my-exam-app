@@ -126,10 +126,12 @@ def log_audit_event(event_type, username, details=""):
         # Zaman damgası
         ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
-        # --- BÜTÜNLÜK İMZASI (INTEGRITY HASH) OLUŞTURMA ---
-        # Logun içeriğini birleştirip SHA-256 ile imzala.
-        # Biri Excel'den veriyi değiştirirse, bu hash tutmayacağı için yakalanır.
-        raw_data = f"{ts}|{event_type}|{username}|{details}|{st.secrets['general']['encryption_key']}"
+        # --- BÜTÜNLÜK İMZASI (INTEGRITY HASH) ---
+        # DÜZELTME: st.secrets yerine kodun başındaki FIXED_KEY kullanıldı.
+        # Bu sayede 'KeyError' hatası almadan çalışacak.
+        secret_salt = str(FIXED_KEY) 
+        
+        raw_data = f"{ts}|{event_type}|{username}|{details}|{secret_salt}"
         checksum = hashlib.sha256(raw_data.encode()).hexdigest()
         
         new_log = pd.DataFrame([{
@@ -137,13 +139,14 @@ def log_audit_event(event_type, username, details=""):
             "event_type": event_type,
             "username": username,
             "details": details,
-            "checksum": checksum # İmzayı da kaydet
+            "checksum": checksum
         }])
         
         updated_logs = pd.concat([logs_df, new_log], ignore_index=True)
         conn.update(worksheet="Audit_Logs", data=updated_logs)
     except Exception as e:
-        print(f"Audit Log Error: {e}")
+        # Hata varsa ekrana yaz ki görelim (Sessiz kalmasın)
+        st.error(f"Audit Log Error: {e}")
 
 # --- YENİ: ŞİFRELEME YARDIMCILARI ---
 def encrypt_data(data_str):
