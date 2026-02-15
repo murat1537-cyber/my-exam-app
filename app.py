@@ -115,25 +115,35 @@ for k, v in defaults.items():
 
 # --- YENİ: AUDIT LOGGING ---
 def log_audit_event(event_type, username, details=""):
-    """Güvenlik olaylarını Audit_Logs sayfasına kaydeder."""
+    """Güvenlik olaylarını Audit_Logs sayfasına HASH imzasıyla kaydeder."""
     try:
-        # Mevcut logları oku veya boş oluştur
+        # Mevcut logları oku
         try:
             logs_df = conn.read(worksheet="Audit_Logs", ttl=0)
         except:
-            logs_df = pd.DataFrame(columns=["timestamp", "event_type", "username", "details"])
+            logs_df = pd.DataFrame(columns=["timestamp", "event_type", "username", "details", "checksum"])
+        
+        # Zaman damgası
+        ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        # --- BÜTÜNLÜK İMZASI (INTEGRITY HASH) OLUŞTURMA ---
+        # Logun içeriğini birleştirip SHA-256 ile imzala.
+        # Biri Excel'den veriyi değiştirirse, bu hash tutmayacağı için yakalanır.
+        raw_data = f"{ts}|{event_type}|{username}|{details}|{st.secrets['general']['encryption_key']}"
+        checksum = hashlib.sha256(raw_data.encode()).hexdigest()
         
         new_log = pd.DataFrame([{
-            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "timestamp": ts,
             "event_type": event_type,
             "username": username,
-            "details": details
+            "details": details,
+            "checksum": checksum # İmzayı da kaydet
         }])
         
         updated_logs = pd.concat([logs_df, new_log], ignore_index=True)
         conn.update(worksheet="Audit_Logs", data=updated_logs)
     except Exception as e:
-        print(f"Audit Log Error: {e}") # Loglama hatası uygulamayı durdurmamalı
+        print(f"Audit Log Error: {e}")
 
 # --- YENİ: ŞİFRELEME YARDIMCILARI ---
 def encrypt_data(data_str):
