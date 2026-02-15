@@ -634,9 +634,7 @@ if st.session_state.view == 'Main':
                                         st.error("❌ Invalid Code")
                             if st.button("Cancel Login"): st.session_state.login_step = 'credentials'; st.session_state.temp_user_data = None; st.rerun()
 
-                with tab2:
-                    st.write("")
-                    with tab_signup: # (Eğer kodunda with tab2 ise orayı değiştir)
+                with tab_signup: # (Eğer kodunda with tab2 ise orayı değiştir)
                 st.write("")
                 with st.form("s_form"):
                     st.markdown("##### Create New Account")
